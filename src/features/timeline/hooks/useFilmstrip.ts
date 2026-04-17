@@ -12,11 +12,23 @@ const { FPS, FILMSTRIP } = VIDEO_CONFIG;
 
 /**
  * Convert Tauri asset URL to file system path for Rust backend
+ * asset://localhost/Users/... -> /Users/...
+ * asset://localhost/C:/Users/... -> C:/Users/... (Windows)
  */
 function assetUrlToFilePath(assetUrl: string): string {
   if (assetUrl.startsWith("asset://")) {
-    const path = assetUrl.replace(/^asset:\/\/[^/]+\//, "");
-    return decodeURIComponent(path);
+    // Remove asset://localhost/ or asset:/// prefix
+    let path = assetUrl.replace(/^asset:\/\/[^/]*\//, "");
+    // URL decode
+    path = decodeURIComponent(path);
+
+    // On Windows, Tauri returns /C:/Users/... style paths
+    // Convert to proper Windows path: C:/Users/...
+    if (path.match(/^\/[A-Za-z]:\//)) {
+      path = path.substring(1); // Remove leading / from /C:/...
+    }
+
+    return path;
   }
   return assetUrl;
 }

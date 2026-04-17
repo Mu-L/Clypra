@@ -249,6 +249,14 @@ async fn extract_frame_at_time(
 
     use tokio::time::{timeout, Duration};
 
+    // Hybrid seeking strategy for frame-accurate extraction:
+    // 1. Fast seek to 2 seconds before target (keyframe, fast)
+    // 2. Precise decode the remaining 2 seconds to exact frame (accurate)
+    let fast_seek_time = (time_secs - 2.0).max(0.0);
+    let precise_seek_secs = if fast_seek_time > 0.0 { "2.0" } else { &time_str };
+    
+    let fast_seek_str = format!("{:.3}", fast_seek_time);
+
     // Spawn FFmpeg with 5-second timeout
     let ffmpeg_result = timeout(
         Duration::from_secs(5),
@@ -256,9 +264,11 @@ async fn extract_frame_at_time(
             .args([
                 "-hide_banner",
                 "-loglevel", "error",
-                // Input seeking for speed (keyframe-accurate, then decode to exact frame)
-                "-ss", &time_str,
+                // Fast input seek to keyframe near target (fast but less accurate)
+                "-ss", &fast_seek_str,
                 "-i", &input_path,
+                // Precise output seek to exact frame (decodes from keyframe to target)
+                "-ss", precise_seek_secs,
                 // Output just one frame
                 "-vframes", "1",
                 // Scale to requested dimensions

@@ -121,13 +121,22 @@ export class FrameExtractor {
   /**
    * Convert Tauri asset URL to file system path
    * asset://localhost/Users/... -> /Users/...
+   * asset://localhost/C:/Users/... -> C:/Users/... (Windows)
    */
   private assetUrlToFilePath(assetUrl: string): string {
     if (assetUrl.startsWith("asset://")) {
-      // Remove asset://localhost/ prefix
-      const path = assetUrl.replace(/^asset:\/\/[^/]+\//, "");
+      // Remove asset://localhost/ or asset:/// prefix
+      let path = assetUrl.replace(/^asset:\/\/[^/]*\//, "");
       // URL decode
-      return decodeURIComponent(path);
+      path = decodeURIComponent(path);
+
+      // On Windows, Tauri returns /C:/Users/... style paths
+      // Convert to proper Windows path: C:/Users/...
+      if (path.match(/^\/[A-Za-z]:\//)) {
+        path = path.substring(1); // Remove leading / from /C:/...
+      }
+
+      return path;
     }
     return assetUrl;
   }
