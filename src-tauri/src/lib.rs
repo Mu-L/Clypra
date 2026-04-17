@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use tauri::Manager;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 /// Downsampled peak envelope of the first audio stream (for waveform UI). Returns ~`bucket_count`
 /// values in 0..1. If there is no audio, returns zeros.
@@ -344,7 +345,7 @@ async fn extract_frame_at_time(
             }
 
             // Encode PNG bytes to base64 data URL
-            let base64_data = base64::encode(&output.stdout);
+            let base64_data = BASE64.encode(&output.stdout);
             Ok(format!("data:image/png;base64,{}", base64_data))
         }
         Ok(Err(e)) => Err(format!("Failed to spawn FFmpeg: {}", e)),
@@ -482,7 +483,7 @@ async fn extract_filmstrip_frames(
             for i in 1..=frame_count {
                 let frame_path = temp_dir.join(format!("frame_{:03}.png", i));
                 if let Ok(data) = std::fs::read(&frame_path) {
-                    let base64_data = base64::encode(&data);
+                    let base64_data = BASE64.encode(&data);
                     frames.push(format!("data:image/png;base64,{}", base64_data));
                 }
             }
@@ -562,7 +563,7 @@ fn save_frame_to_cache(
     
     // Parse data URL and save
     if let Some(base64_data) = data_url.strip_prefix("data:image/png;base64,") {
-        let decoded = base64::decode(base64_data)
+        let decoded = BASE64.decode(base64_data)
             .map_err(|e| format!("Failed to decode base64: {}", e))?;
         std::fs::write(&frame_path, decoded)
             .map_err(|e| format!("Failed to write frame: {}", e))?;
@@ -584,14 +585,12 @@ fn read_cached_frame(
     if let Some(path) = get_cached_frame_path(app_handle, video_path, time_secs, width, height)? {
         let data = std::fs::read(&path)
             .map_err(|e| format!("Failed to read cached frame: {}", e))?;
-        let base64_data = base64::encode(&data);
+        let base64_data = BASE64.encode(&data);
         Ok(Some(format!("data:image/png;base64,{}", base64_data)))
     } else {
         Ok(None)
     }
 }
-
-/// Clear the entire frame cache
 #[tauri::command]
 fn clear_frame_cache(app_handle: tauri::AppHandle) -> Result<(), String> {
     let cache_dir = get_frame_cache_dir(app_handle)?;
