@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
@@ -303,6 +304,9 @@ async fn extract_frame_at_time(
     // Add hardware acceleration args before -i
     ffmpeg_args.extend(hwaccel_args.iter().cloned());
     
+    // Create vf filter string with proper lifetime
+    let vf_filter = format!("scale={}:force_original_aspect_ratio=decrease,pad={}:(ow-iw)/2:(oh-ih)/2:black", scale_str, scale_str);
+    
     // Continue with input and output args
     ffmpeg_args.extend([
         "-i", &input_path,
@@ -311,7 +315,7 @@ async fn extract_frame_at_time(
         // Output just one frame
         "-vframes", "1",
         // Scale to requested dimensions
-        "-vf", &format!("scale={}:force_original_aspect_ratio=decrease,pad={}:(ow-iw)/2:(oh-ih)/2:black", scale_str, scale_str),
+        "-vf", &vf_filter,
         // PNG for lossless quality
         "-f", "image2",
         "-vcodec", "png",
@@ -501,9 +505,9 @@ async fn extract_filmstrip_frames(
 #[tauri::command]
 fn get_frame_cache_dir(app_handle: tauri::AppHandle) -> Result<String, String> {
     let cache_dir = app_handle
-        .path_resolver()
+        .path()
         .app_cache_dir()
-        .ok_or("Failed to get app cache dir")?
+        .map_err(|e| format!("Failed to get app cache dir: {}", e))?
         .join("frames");
     
     std::fs::create_dir_all(&cache_dir)
