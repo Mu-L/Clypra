@@ -273,7 +273,7 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({ baseWidth, bas
   };
 
   /**
-   * Render video frames to canvas (smooth playback)
+   * Render video frames to canvas (smooth playback) with aspect ratio preservation
    */
   const renderVideoFrames = () => {
     if (!contextRef.current) return;
@@ -281,23 +281,43 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({ baseWidth, bas
     const ctx = contextRef.current;
     const { width, height } = canvasDimensions;
 
-    // Clear canvas
+    // Clear canvas with black background
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, width, height);
 
-    // Draw each video element
+    // Draw each video element with aspect ratio preservation
     const sortedClips = [...activeClipsRef.current].sort((a, b) => a.trackIndex - b.trackIndex);
 
     for (const clip of sortedClips) {
       const video = videoElementsRef.current.get(clip.sourceMediaPath);
-      if (video && video.readyState >= 2) {
-        ctx.drawImage(video, 0, 0, width, height);
+      if (video && video.readyState >= 2 && video.videoWidth > 0) {
+        // Calculate aspect-ratio-preserving draw dimensions
+        const videoAspect = video.videoWidth / video.videoHeight;
+        const canvasAspect = width / height;
+
+        let drawWidth = width;
+        let drawHeight = height;
+        let drawX = 0;
+        let drawY = 0;
+
+        if (videoAspect > canvasAspect) {
+          // Video is wider - fit to width, center vertically
+          drawHeight = width / videoAspect;
+          drawY = (height - drawHeight) / 2;
+        } else {
+          // Video is taller - fit to height, center horizontally
+          drawWidth = height * videoAspect;
+          drawX = (width - drawWidth) / 2;
+        }
+
+        ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
       }
     }
   };
 
   /**
    * Start RAF loop for playback - uses video elements for smooth playback
+   * Optimized: only updates timeline every 3rd frame to reduce React re-renders
    */
   const startRAFLoop = () => {
     if (rafIdRef.current) {
@@ -315,6 +335,7 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({ baseWidth, bas
 
     let lastTime = performance.now();
     let frameCount = 0;
+    let lastPlayheadUpdate = 0;
 
     const loop = () => {
       const now = performance.now();
@@ -342,8 +363,12 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({ baseWidth, bas
         return;
       }
 
-      // Update playhead
-      useTimelineStore.getState().setPlayhead(currentTime);
+      // Update playhead only every ~50ms (20fps) to reduce React re-renders
+      // This keeps UI responsive while video plays smoothly at 60fps
+      if (now - lastPlayheadUpdate > 50) {
+        useTimelineStore.getState().setPlayhead(currentTime, false); // Don't capture history during playback
+        lastPlayheadUpdate = now;
+      }
 
       // Render video frames to canvas (smooth, not FFmpeg)
       renderVideoFrames();
