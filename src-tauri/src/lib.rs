@@ -4,6 +4,9 @@ use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
+mod thumbnail_engine;
+use thumbnail_engine::{DensityLevel, Priority, init_thumbnail_engine, request_batch_thumbnails, generate_timestamp_grid, get_cache_stats, clear_video_thumbnail_cache};
+
 /// Downsampled peak envelope of the first audio stream (for waveform UI). Returns ~`bucket_count`
 /// values in 0..1. If there is no audio, returns zeros.
 #[tauri::command]
@@ -306,8 +309,9 @@ async fn extract_frame_at_time(
     // Add hardware acceleration args before -i
     ffmpeg_args.extend(hwaccel_args.iter().cloned());
     
-    // Create vf filter string with proper lifetime
-    let vf_filter = format!("scale={}:force_original_aspect_ratio=decrease,pad={}:(ow-iw)/2:(oh-ih)/2:black", scale_str, scale_str);
+    // Create vf filter string - scale to fill then crop (no black bars)
+    // force_original_aspect_ratio=increase scales up to fill, then crop centers the crop
+    let vf_filter = format!("scale={}:force_original_aspect_ratio=increase,crop={}:{}", scale_str, width, height);
     
     // Continue with input and output args
     ffmpeg_args.extend([
@@ -629,6 +633,82 @@ fn get_frame_cache_size(app_handle: tauri::AppHandle) -> Result<f64, String> {
     Ok(total_size as f64 / (1024.0 * 1024.0)) // Convert to MB
 }
 
+/// Initialize the thumbnail engine with app cache directory
+#[tauri::command]
+async fn init_thumbnail_cache(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let cache_dir = app_handle
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("Failed to get cache dir: {}", e))?;
+    init_thumbnail_engine(cache_dir).await
+}
+
+/// Get thumbnails for visible time range using CapCut-style grid sampling
+#[tauri::command]
+async fn get_thumbnails_for_range(
+    video_path: String,
+    visible_start: f64,
+    visible_end: f64,
+    px_per_sec: f64,
+) -> Result<Vec<(f64, String, f64)>, String> {
+    // Calculate density based on zoom
+    let density = DensityLevel::from_zoom(px_per_sec);
+    let time_per_thumb = 80.0 / px_per_sec;
+
+    // Generate timestamp grid
+    let timestamps = generate_timestamp_grid(visible_start, visible_end, time_per_thumb);
+
+    if timestamps.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Request batch extraction with critical priority (visible range)
+    let results = request_batch_thumbnails(
+        &video_path,
+        timestamps.clone(),
+        density,
+        Priority::Critical,
+        80,
+        60,
+    ).await;
+
+    // Convert results to (time, data_url, x_position) tuples
+    let mut thumbnails = Vec::with_capacity(results.len());
+
+    for (i, result) in results.iter().enumerate() {
+        let time = timestamps[i];
+        let x = (time - visible_start) / time_per_thumb * 80.0;
+
+        match result {
+            Ok(path) => {
+                // Read the cached frame and convert to data URL
+                if let Ok(data) = std::fs::read(path) {
+                    let base64_data = BASE64.encode(&data);
+                    let data_url = format!("data:image/webp;base64,{}", base64_data);
+                    thumbnails.push((time, data_url, x));
+                }
+            }
+            Err(e) => {
+                eprintln!("[ThumbnailEngine] Failed to get thumbnail at {}: {}", time, e);
+            }
+        }
+    }
+
+    Ok(thumbnails)
+}
+
+/// Get thumbnail cache statistics
+#[tauri::command]
+fn get_thumbnail_cache_stats() -> serde_json::Value {
+    get_cache_stats()
+}
+
+/// Clear thumbnail cache for a specific video
+#[tauri::command]
+async fn clear_thumbnail_cache(video_path: String) {
+    clear_video_thumbnail_cache(&video_path).await;
+}
+
 #[cfg(test)]
 mod lib_test;
 
@@ -648,6 +728,10 @@ pub fn run() {
             read_cached_frame,
             clear_frame_cache,
             get_frame_cache_size,
+            init_thumbnail_cache,
+            get_thumbnails_for_range,
+            get_thumbnail_cache_stats,
+            clear_thumbnail_cache,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

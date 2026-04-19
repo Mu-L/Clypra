@@ -11,7 +11,7 @@ import { COLORS } from "../../../constants/colors";
 import { Waveform } from "./Waveform";
 import { useWaveform } from "../hooks/useWaveform";
 import { useThumbnailEngine } from "../hooks/useThumbnailEngine";
-import { THUMBNAIL_WIDTH } from "../utils/ThumbnailEngine";
+// import { THUMBNAIL_WIDTH } from "../utils/ThumbnailEngine";
 import { useClipDrag } from "../hooks/useClipDrag";
 import { useClipTrim } from "../hooks/useClipTrim";
 import { useTimelineStore } from "../store/timelineStore";
@@ -20,7 +20,25 @@ interface ClipProps {
   clip: ClipType;
   isSelected: boolean;
   pxPerSec: number;
+  viewportWidth?: number; // For thumbnail generation
   onSelect: (id: string, multi: boolean) => void;
+}
+
+/**
+ * Convert Tauri asset URL to file path for FFmpeg
+ * asset://localhost/%2FUsers%2F... → /Users/...
+ */
+function getFilePathFromAssetUrl(assetUrl: string): string {
+  if (!assetUrl.startsWith("asset://")) {
+    return assetUrl; // Already a file path
+  }
+  try {
+    const url = new URL(assetUrl);
+    const pathname = decodeURIComponent(url.pathname);
+    return pathname;
+  } catch {
+    return assetUrl;
+  }
 }
 
 /**
@@ -54,9 +72,10 @@ function getClipColors(type: ClipType["type"]): { background: string; border: st
 /**
  * Clip component with memoization for performance
  */
-export const Clip = memo(function Clip({ clip, isSelected, pxPerSec, onSelect }: ClipProps) {
+export const Clip = memo(function Clip({ clip, isSelected, pxPerSec, viewportWidth = 2000, onSelect }: ClipProps) {
   const coords = useMemo(() => new CoordinateSystem(pxPerSec), [pxPerSec]);
   const dragState = useTimelineStore((state) => state.dragState);
+  const scrollLeft = useTimelineStore((state) => state.scrollLeft);
 
   // Calculate clip position and width with memoization
   const { x: baseX, width } = useMemo(
@@ -78,13 +97,17 @@ export const Clip = memo(function Clip({ clip, isSelected, pxPerSec, onSelect }:
   const colors = getClipColors(clip.type);
 
   const hasAudio = clip.type === "audio" || clip.type === "video";
+  const hasVideo = clip.type === "video";
   const { peaks, loading: waveformLoading, error: waveformError } = useWaveform(clip.sourceMediaPath, hasAudio);
 
   // Use new ThumbnailEngine for zoom-adaptive sampling
+  // Convert asset:// URL to file path for FFmpeg
+  const videoFilePath = getFilePathFromAssetUrl(clip.sourceMediaPath);
   const { thumbnails, loading: thumbsLoading } = useThumbnailEngine({
-    videoPath: clip.sourceMediaPath,
+    videoPath: videoFilePath,
     clipStartTime: clip.sourceStart,
     clipEndTime: clip.sourceStart + clip.duration,
+    viewportWidth, // Pass actual viewport width for accurate thumbnail generation
   });
 
   const { handlePointerDown: handleDragStart } = useClipDrag({ clipId: clip.id, coords });
@@ -155,22 +178,26 @@ export const Clip = memo(function Clip({ clip, isSelected, pxPerSec, onSelect }:
       aria-selected={isSelected}
       aria-grabbed={isDragging ? "true" : "false"}
     >
-      {/* Video thumbnails - fixed 80px width, zoom controls time density (CapCut style) */}
-      {hasAudio && clip.type === "video" && (
-        <div className="absolute top-0 left-0 right-0 h-[60px] pointer-events-none overflow-hidden flex" role="img" aria-label={thumbsLoading ? "Loading video preview" : thumbnails.length ? `Video preview for ${clip.name}` : "Video preview unavailable"}>
+      {/* Video thumbnails - absolute positioned by time (CapCut algorithm) */}
+      {hasVideo && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" role="img" aria-label={thumbsLoading ? "Loading video preview" : thumbnails.length ? `Video preview for ${clip.name}` : "Video preview unavailable"}>
           {thumbsLoading && thumbnails.length === 0 && (
-            <div className="flex items-center justify-center h-full w-full">
+            <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-[10px] text-white/60">Loading thumbnails...</div>
             </div>
           )}
           {!thumbsLoading && thumbnails.length === 0 && (
-            <div className="flex items-center justify-center h-full w-full">
+            <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-[10px] text-white/40">No preview</div>
             </div>
           )}
-          {thumbnails.map((thumb) => (
-            <img key={thumb.time} src={thumb.dataUrl} alt="" className="h-full object-cover shrink-0" style={{ width: 80 }} draggable={false} />
-          ))}
+          {thumbnails.map((thumb) => {
+            // Calculate position relative to clip start: x = (thumb.time - clip.startTime) * pxPerSec
+            // But thumb.x is relative to viewport, so we need to convert to clip-relative
+            const clipStartPx = clip.startTime * pxPerSec;
+            const relativeX = thumb.x - clipStartPx + scrollLeft;
+            return <img key={thumb.time} src={thumb.dataUrl} alt="" className="absolute top-0 h-[60px] w-[80px] object-cover m-0 p-0 border-0" style={{ left: relativeX }} draggable={false} />;
+          })}
         </div>
       )}
 

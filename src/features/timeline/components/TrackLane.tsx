@@ -40,7 +40,7 @@ export const TrackLane = memo(function TrackLane({ track, clips, selectedClipIds
     >
       {/* Render visible clips */}
       {visibleClips.map((clip) => (
-        <Clip key={clip.id} clip={clip} isSelected={selectedClipIds.has(clip.id)} pxPerSec={pxPerSec} onSelect={onClipSelect} />
+        <Clip key={clip.id} clip={clip} isSelected={selectedClipIds.has(clip.id)} pxPerSec={pxPerSec} viewportWidth={viewportWidth} onSelect={onClipSelect} />
       ))}
 
       {/* Track locked overlay */}

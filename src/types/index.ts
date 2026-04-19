@@ -1,11 +1,16 @@
 export type TimelineProps = {
   duration: number;
-  trimStart: number;
-  trimEnd: number;
   playhead: number;
   onSeek: (t: number) => void;
-  videoUrl: string | null;
-  sourcePath: string | null;
+  /** @deprecated Not used with store-based timeline */
+  trimStart?: number;
+  /** @deprecated Not used with store-based timeline */
+  trimEnd?: number;
+  /** @deprecated Not used with store-based timeline */
+  videoUrl?: string | null;
+  /** @deprecated Not used with store-based timeline */
+  sourcePath?: string | null;
+  /** @deprecated Not used with store-based timeline */
   videoRef?: React.RefObject<HTMLVideoElement>;
 };
 

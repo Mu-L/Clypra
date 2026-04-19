@@ -1,36 +1,14 @@
 import { extractFrameAtTime } from "../../../lib/tauri";
 
 /**
- * Thumbnail sampling density levels
- */
-export type DensityLevel = "low" | "medium" | "high" | "ultra";
-
-interface DensityConfig {
-  timePerFrame: number; // seconds between frames
-  label: DensityLevel;
-}
-
-/**
- * Maps zoom level to appropriate sampling density
- */
-const ZOOM_DENSITY_MAP: Record<number, DensityConfig> = {
-  0.25: { timePerFrame: 10, label: "low" },     // 0.25x zoom: frame every 10s
-  0.5: { timePerFrame: 5, label: "low" },        // 0.5x zoom: frame every 5s
-  1: { timePerFrame: 2, label: "medium" },       // 1x zoom: frame every 2s
-  2: { timePerFrame: 1, label: "medium" },       // 2x zoom: frame every 1s
-  4: { timePerFrame: 0.5, label: "high" },      // 4x zoom: frame every 0.5s
-  8: { timePerFrame: 0.25, label: "high" },      // 8x zoom: frame every 0.25s
-  16: { timePerFrame: 0.1, label: "ultra" },    // 16x zoom: frame every 0.1s
-};
-
-/**
  * Fixed thumbnail dimensions (CapCut-style)
+ * Thumbnails are always 80px wide on screen regardless of zoom
  */
 export const THUMBNAIL_WIDTH = 80;
 export const THUMBNAIL_HEIGHT = 60;
 
 /**
- * Cached frame data
+ * Cached frame data - keyed by timestamp (seconds)
  */
 interface CachedFrame {
   time: number;
@@ -39,148 +17,177 @@ interface CachedFrame {
 }
 
 /**
- * Cache for a specific video and density level
+ * Cache for a specific video
  */
 interface VideoCache {
-  [density: string]: {
-    frames: Map<number, CachedFrame>; // time -> frame
-    lastAccessed: number;
-  };
+  frames: Map<number, CachedFrame>; // time -> frame
+  lastAccessed: number;
 }
 
 /**
  * ThumbnailEngine - Manages time-sampled frame extraction with multi-resolution caching
- * 
- * Core principle: Zoom changes time density, not thumbnail width
+ *
+ * Core principle: Global time-grid sampling with fixed thumbnail width
  * - Thumbnail width is CONSTANT (80px)
- * - Time per thumbnail varies with zoom
+ * - Time per thumbnail varies with zoom: timePerThumb = 80 / pxPerSec
+ * - Thumbnails are sampled at global time intervals aligned to a grid
+ * - Each thumbnail is positioned absolutely by its time value
  */
 export class ThumbnailEngine {
   private cache = new Map<string, VideoCache>(); // videoPath -> VideoCache
-  private maxCacheSize = 100; // max frames per density level
+  private maxCacheSize = 500; // max frames per video
   private abortControllers = new Map<string, AbortController>();
-
-  /**
-   * Get density config for current zoom level
-   */
-  private getDensityForZoom(zoom: number): DensityConfig {
-    const sortedZooms = Object.keys(ZOOM_DENSITY_MAP)
-      .map(Number)
-      .sort((a, b) => a - b);
-    
-    // Find closest zoom level
-    let closest = sortedZooms[0];
-    for (const z of sortedZooms) {
-      if (zoom >= z) {
-        closest = z;
-      } else {
-        break;
-      }
-    }
-    
-    return ZOOM_DENSITY_MAP[closest];
-  }
-
-  /**
-   * Generate cache key for a video
-   */
-  private getCacheKey(videoPath: string, startTime: number, endTime: number): string {
-    return `${videoPath}:${startTime}:${endTime}`;
-  }
 
   /**
    * Get or create cache entry for video
    */
   private getVideoCache(videoPath: string): VideoCache {
     if (!this.cache.has(videoPath)) {
-      this.cache.set(videoPath, {});
+      this.cache.set(videoPath, {
+        frames: new Map(),
+        lastAccessed: Date.now(),
+      });
     }
     return this.cache.get(videoPath)!;
   }
 
   /**
-   * Generate thumbnails for a time range
-   * Returns array of { time, dataUrl } for rendering
+   * Calculate time per thumbnail based on zoom level
+   * CapCut: timePerThumb = THUMB_WIDTH / pxPerSec
+   * This gives the time interval needed for 80px at current zoom
    */
-  async generateThumbnails(
-    videoPath: string,
-    clipStartTime: number,
-    clipEndTime: number,
-    zoom: number,
-    visibleStart: number,
-    visibleEnd: number
-  ): Promise<Array<{ time: number; dataUrl: string }>> {
-    const density = this.getDensityForZoom(zoom);
+  calculateTimePerThumbnail(pxPerSec: number): number {
+    return THUMBNAIL_WIDTH / pxPerSec;
+  }
+
+  /**
+   * Generate timestamps on a global time grid aligned to timePerThumb intervals
+   *
+   * This ensures:
+   * - Thumbnails align to a global grid (no jitter when scrolling)
+   * - Consistent sampling density across all clips
+   * - Can overdraw beyond clip bounds for smooth edges
+   *
+   * @param visibleStart - Global visible start time in seconds
+   * @param visibleEnd - Global visible end time in seconds
+   * @param timePerThumb - Time interval between thumbnails (from calculateTimePerThumbnail)
+   * @param _clipStart - Clip start time (for filtering)
+   * @param _clipEnd - Clip end time (for filtering)
+   * @returns Array of timestamp objects with time and x position
+   */
+  generateTimestampGrid(visibleStart: number, visibleEnd: number, timePerThumb: number, _clipStart: number, _clipEnd: number): Array<{ time: number; x: number }> {
+    const timestamps: Array<{ time: number; x: number }> = [];
+
+    // Align to global grid: find first thumbnail at or before visible start
+    const firstThumbTime = Math.floor(visibleStart / timePerThumb) * timePerThumb;
+
+    // Generate timestamps across visible range
+    // Include thumbnails that overlap clip boundaries (overdraw for smooth edges)
+    const bufferTime = timePerThumb; // One extra thumbnail worth of buffer
+    const gridStart = firstThumbTime - bufferTime;
+    const gridEnd = visibleEnd + bufferTime;
+
+    for (let t = gridStart; t <= gridEnd; t += timePerThumb) {
+      // Round to avoid floating point issues
+      const time = Math.round(t * 1000) / 1000;
+
+      // Calculate x position: x = (time - visibleStart) * pxPerSec
+      // But we use timePerThumb to calculate position: x = (time - visibleStart) / timePerThumb * THUMB_WIDTH
+      const x = ((time - visibleStart) / timePerThumb) * THUMBNAIL_WIDTH;
+
+      timestamps.push({ time, x });
+    }
+
+    return timestamps;
+  }
+
+  /**
+   * Generate thumbnails using global time-grid sampling (CapCut algorithm)
+   *
+   * Core principle:
+   * - Global time per thumbnail: timePerThumb = 80 / pxPerSec
+   * - Sample on aligned time grid for consistent positioning
+   * - Thumbnails positioned absolutely by time value
+   *
+   * @param videoPath - Path to video file
+   * @param clipStartTime - Clip start time in seconds
+   * @param clipEndTime - Clip end time in seconds
+   * @param pxPerSec - Pixels per second (zoom level)
+   * @param scrollLeftPx - Horizontal scroll position in pixels
+   * @param viewportWidthPx - Viewport/container width in pixels
+   * @returns Array of { time, dataUrl, x } for absolute positioning
+   */
+  async generateThumbnails(videoPath: string, clipStartTime: number, clipEndTime: number, pxPerSec: number, scrollLeftPx: number, viewportWidthPx: number): Promise<Array<{ time: number; dataUrl: string; x: number }>> {
     const videoCache = this.getVideoCache(videoPath);
-    
-    // Ensure density cache exists
-    if (!videoCache[density.label]) {
-      videoCache[density.label] = {
-        frames: new Map(),
-        lastAccessed: Date.now(),
-      };
-    }
-    
-    const densityCache = videoCache[density.label];
-    densityCache.lastAccessed = Date.now();
+    videoCache.lastAccessed = Date.now();
 
-    // Calculate visible time range (with buffer for smooth scrolling)
-    const bufferSeconds = density.timePerFrame * 2;
-    const renderStart = Math.max(clipStartTime, visibleStart - bufferSeconds);
-    const renderEnd = Math.min(clipEndTime, visibleEnd + bufferSeconds);
+    // Step 1: Calculate global time per thumbnail
+    const timePerThumb = this.calculateTimePerThumbnail(pxPerSec);
 
-    // Generate time points for this density
-    const timePoints: number[] = [];
-    for (let t = renderStart; t <= renderEnd; t += density.timePerFrame) {
-      // Align to nearest frame boundary for consistency
-      const alignedTime = Math.floor(t / density.timePerFrame) * density.timePerFrame;
-      timePoints.push(alignedTime);
+    // Step 2: Calculate visible time range from pixel coordinates
+    const visibleStartSec = scrollLeftPx / pxPerSec;
+    const visibleEndSec = (scrollLeftPx + viewportWidthPx) / pxPerSec;
+
+    // Step 3: Generate timestamp grid
+    const timeGrid = this.generateTimestampGrid(visibleStartSec, visibleEndSec, timePerThumb, clipStartTime, clipEndTime);
+
+    // Step 4: Filter to only times within clip bounds (but keep the calculated x positions)
+    const clipTimePoints = timeGrid.filter((point) => point.time >= clipStartTime && point.time < clipEndTime);
+
+    // If no thumbnails in clip bounds, return empty
+    if (clipTimePoints.length === 0) {
+      return [];
     }
 
-    // Abort any previous extraction for this video
-    const cacheKey = this.getCacheKey(videoPath, clipStartTime, clipEndTime);
+    // Step 5: Abort any previous extraction for this video
+    const cacheKey = `${videoPath}:${clipStartTime}:${clipEndTime}`;
     this.abortControllers.get(cacheKey)?.abort();
     const controller = new AbortController();
     this.abortControllers.set(cacheKey, controller);
 
-    // Check cache and extract missing frames
-    const results: Array<{ time: number; dataUrl: string }> = [];
-    const missingTimes: number[] = [];
+    // Step 6: Check cache and collect missing times
+    const results: Array<{ time: number; dataUrl: string; x: number }> = [];
+    const missingItems: Array<{ time: number; x: number }> = [];
 
-    for (const time of timePoints) {
-      const cached = densityCache.frames.get(time);
-      if (cached && Date.now() - cached.timestamp < 300000) { // 5min cache validity
-        results.push({ time, dataUrl: cached.dataUrl });
+    for (const item of clipTimePoints) {
+      const cached = videoCache.frames.get(item.time);
+      if (cached && Date.now() - cached.timestamp < 300000) {
+        // 5min cache validity
+        results.push({ time: item.time, dataUrl: cached.dataUrl, x: item.x });
       } else {
-        missingTimes.push(time);
+        missingItems.push(item);
       }
     }
 
-    // Extract missing frames (batch them)
-    if (missingTimes.length > 0 && !controller.signal.aborted) {
-      // Extract frames sequentially to avoid overwhelming FFmpeg
-      for (const time of missingTimes) {
-        if (controller.signal.aborted) break;
-        
-        try {
-          const frameData = await extractFrameAtTime(videoPath, time, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
-          
-          if (!controller.signal.aborted) {
-            // Cache the frame
-            densityCache.frames.set(time, {
+    // Step 7: Extract missing frames in parallel batches
+    if (missingItems.length > 0 && !controller.signal.aborted) {
+      const CONCURRENCY = 4;
+
+      for (let i = 0; i < missingItems.length && !controller.signal.aborted; i += CONCURRENCY) {
+        const batch = missingItems.slice(i, i + CONCURRENCY);
+
+        const batchResults = await Promise.allSettled(
+          batch.map(async (item) => {
+            const frameData = await extractFrameAtTime(videoPath, item.time, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
+            return { time: item.time, x: item.x, frameData };
+          }),
+        );
+
+        for (const result of batchResults) {
+          if (result.status === "fulfilled" && !controller.signal.aborted) {
+            const { time, x, frameData } = result.value;
+            videoCache.frames.set(time, {
               time,
               dataUrl: frameData,
               timestamp: Date.now(),
             });
-            
-            results.push({ time, dataUrl: frameData });
-            
-            // Evict old frames if cache too large
-            this.evictIfNeeded(densityCache);
+            results.push({ time, dataUrl: frameData, x });
+          } else if (result.status === "rejected") {
+            console.error(`[ThumbnailEngine] Failed to extract frame:`, result.reason);
           }
-        } catch (error) {
-          console.error(`[ThumbnailEngine] Failed to extract frame at ${time}:`, error);
         }
+
+        this.evictIfNeeded(videoCache);
       }
     }
 
@@ -196,8 +203,7 @@ export class ThumbnailEngine {
     if (cache.frames.size > this.maxCacheSize) {
       const entries = Array.from(cache.frames.entries());
       entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-      
-      // Remove oldest 20%
+
       const toRemove = Math.floor(this.maxCacheSize * 0.2);
       for (let i = 0; i < toRemove; i++) {
         cache.frames.delete(entries[i][0]);
@@ -206,18 +212,11 @@ export class ThumbnailEngine {
   }
 
   /**
-   * Get time per thumbnail for current zoom (for positioning)
-   */
-  getTimePerThumbnail(zoom: number): number {
-    return this.getDensityForZoom(zoom).timePerFrame;
-  }
-
-  /**
    * Clear cache for a video (e.g., when video is removed)
    */
   clearVideoCache(videoPath: string) {
     this.cache.delete(videoPath);
-    const cacheKey = this.getCacheKey(videoPath, 0, Infinity);
+    const cacheKey = `${videoPath}:0:Infinity`;
     this.abortControllers.get(cacheKey)?.abort();
     this.abortControllers.delete(cacheKey);
   }

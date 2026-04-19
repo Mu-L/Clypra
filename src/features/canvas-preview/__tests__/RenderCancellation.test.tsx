@@ -3,7 +3,6 @@
  * Requirements: 9.3, 9.4
  */
 
-import React from "react";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import { CanvasRenderer } from "../components/CanvasRenderer";
@@ -76,6 +75,10 @@ vi.mock("../utils/RenderEngine", () => {
   return {
     RenderEngine: vi.fn(function (this: any) {
       this.renderFrame = vi.fn();
+      this.drawLoadingIndicator = vi.fn();
+      this.drawNoClipsMessage = vi.fn();
+      this.drawInitializingMessage = vi.fn();
+      this.drawVideoLoadError = vi.fn();
       return this;
     }),
   };
@@ -123,21 +126,21 @@ describe("Render Cancellation Unit Tests", () => {
       const store = useTimelineStore.getState();
 
       // Render with isPlaying = false
-      const { rerender } = render(<CanvasRenderer width={100} height={100} />);
+      const { rerender } = render(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // Start playback (first RAF loop)
       store.setIsPlaying(true);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       expect(requestAnimationFrameSpy).toHaveBeenCalled();
 
       // Stop playback
       store.setIsPlaying(false);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // Start playback again (should cancel previous RAF)
       store.setIsPlaying(true);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // cancelAnimationFrame should have been called
       expect(cancelAnimationFrameSpy).toHaveBeenCalled();
@@ -153,7 +156,7 @@ describe("Render Cancellation Unit Tests", () => {
       const store = useTimelineStore.getState();
       store.setIsPlaying(true);
 
-      const { unmount } = render(<CanvasRenderer width={100} height={100} />);
+      const { unmount } = render(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       expect(requestAnimationFrameSpy).toHaveBeenCalled();
 
@@ -172,17 +175,17 @@ describe("Render Cancellation Unit Tests", () => {
     it("should handle playhead changes without crashing (Requirement 9.4)", () => {
       const store = useTimelineStore.getState();
 
-      const { rerender } = render(<CanvasRenderer width={100} height={100} />);
+      const { rerender } = render(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // Trigger multiple playhead changes
       store.setPlayhead(10);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       store.setPlayhead(20);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       store.setPlayhead(30);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // Verify system handled changes without crashing
       // The component should still be rendered
@@ -192,15 +195,15 @@ describe("Render Cancellation Unit Tests", () => {
     it("should allow new renders after previous render completes (Requirement 9.4)", () => {
       const store = useTimelineStore.getState();
 
-      const { rerender } = render(<CanvasRenderer width={100} height={100} />);
+      const { rerender } = render(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // First render
       store.setPlayhead(10);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // Second render should be allowed
       store.setPlayhead(20);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // Verify second render was processed (component didn't crash)
       expect(true).toBe(true);
@@ -209,13 +212,13 @@ describe("Render Cancellation Unit Tests", () => {
     it("should handle rapid playhead changes gracefully (Requirement 9.3, 9.4)", () => {
       const store = useTimelineStore.getState();
 
-      const { rerender } = render(<CanvasRenderer width={100} height={100} />);
+      const { rerender } = render(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // Trigger rapid playhead changes
       const positions = [10, 20, 30, 40, 50];
       for (const playhead of positions) {
         store.setPlayhead(playhead);
-        rerender(<CanvasRenderer width={100} height={100} />);
+        rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
       }
 
       // Verify system handled rapid changes without crashing
@@ -259,14 +262,14 @@ describe("Render Cancellation Unit Tests", () => {
       store.addTrack(track);
       store.addClip(clip);
 
-      const { rerender } = render(<CanvasRenderer width={100} height={100} />);
+      const { rerender } = render(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // Trigger multiple render requests
       store.setPlayhead(10);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       store.setPlayhead(20);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // Verify system handled multiple requests without crashing
       expect(true).toBe(true);
@@ -278,11 +281,11 @@ describe("Render Cancellation Unit Tests", () => {
       const requestAnimationFrameSpy = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(123 as any);
 
       const store = useTimelineStore.getState();
-      const { rerender } = render(<CanvasRenderer width={100} height={100} />);
+      const { rerender } = render(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // Start playback
       store.setIsPlaying(true);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // RAF should be called
       expect(requestAnimationFrameSpy).toHaveBeenCalled();
@@ -297,11 +300,11 @@ describe("Render Cancellation Unit Tests", () => {
       const store = useTimelineStore.getState();
       store.setIsPlaying(true);
 
-      const { rerender } = render(<CanvasRenderer width={100} height={100} />);
+      const { rerender } = render(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // Stop playback
       store.setIsPlaying(false);
-      rerender(<CanvasRenderer width={100} height={100} />);
+      rerender(<CanvasRenderer baseWidth={100} baseHeight={100} />);
 
       // cancelAnimationFrame should eventually be called
       expect(cancelAnimationFrameSpy).toHaveBeenCalled();

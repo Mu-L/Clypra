@@ -33,8 +33,6 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({ baseWidth, bas
 
   // Hybrid playback: video element for smooth playback, FFmpeg for accurate paused frames
   const videoElementsRef = useRef<Map<string, HTMLVideoElement>>(new Map());
-  const lastFrameTimeRef = useRef<number>(0);
-  const frameSkipCounterRef = useRef<number>(0);
 
   const clips = useTimelineStore((state) => state.clips);
   const tracks = useTimelineStore((state) => state.tracks);
@@ -372,7 +370,7 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({ baseWidth, bas
   };
 
   // Timeline update interval ref
-  const timelineIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timelineIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /**
    * Start playback - video on RAF, timeline on setInterval (decoupled)

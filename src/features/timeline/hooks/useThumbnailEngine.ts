@@ -1,95 +1,83 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { getThumbnailEngine, THUMBNAIL_WIDTH } from "../utils/ThumbnailEngine";
 import { useTimelineStore } from "../store/timelineStore";
 
 interface Thumbnail {
   time: number;
   dataUrl: string;
+  x: number; // Absolute x position relative to viewport
 }
 
 interface UseThumbnailEngineOptions {
   videoPath: string;
   clipStartTime: number;
   clipEndTime: number;
+  viewportWidth?: number; // Actual viewport width in pixels
 }
 
 /**
- * Calculate zoom level from pixelsPerSecond (base = 100px/sec = 1x zoom)
- */
-function calculateZoom(pxPerSec: number): number {
-  return pxPerSec / 100;
-}
-
-/**
- * Hook for zoom-adaptive thumbnail sampling
+ * Hook for CapCut-style thumbnail generation
  *
- * Returns thumbnails at fixed 80px width, with time density controlled by zoom
+ * Core principle: Global time-grid sampling with absolute positioning
+ * - timePerThumb = 80 / pxPerSec (global, not per-clip)
+ * - Thumbnails sampled at aligned time intervals
+ * - Each thumbnail has absolute x position: x = (time - visibleStart) / timePerThumb * 80
+ * - Thumbnails are positioned absolutely within clip, no stretching
  */
 export function useThumbnailEngine(options: UseThumbnailEngineOptions) {
-  const { videoPath, clipStartTime, clipEndTime } = options;
+  const { videoPath, clipStartTime, clipEndTime, viewportWidth = 2000 } = options;
   const pxPerSec = useTimelineStore((state) => state.pxPerSec);
   const scrollLeft = useTimelineStore((state) => state.scrollLeft);
-
-  // Calculate zoom from pxPerSec
-  const zoom = calculateZoom(pxPerSec);
 
   const [thumbnails, setThumbnails] = useState<Thumbnail[]>([]);
   const [loading, setLoading] = useState(false);
   const engineRef = useRef(getThumbnailEngine());
-  const zoomRef = useRef(zoom);
+  const prevCountRef = useRef(0);
 
-  // Calculate visible time range
-  const visibleStart = scrollLeft / pxPerSec;
-  const visibleEnd = (scrollLeft + 2000) / pxPerSec; // Assume 2000px viewport
+  // Calculate global time per thumbnail
+  const timePerThumb = useMemo(() => {
+    return THUMBNAIL_WIDTH / pxPerSec;
+  }, [pxPerSec]);
 
-  // Generate thumbnails when zoom or visibility changes
+  // Generate thumbnails when zoom or scroll changes
   useEffect(() => {
     if (!videoPath) return;
 
     const engine = engineRef.current;
     let cancelled = false;
 
-    // Check if zoom changed significantly (regenerate if so)
-    const zoomChanged = Math.abs(zoom - zoomRef.current) > 0.1;
-    zoomRef.current = zoom;
-
-    if (zoomChanged) {
+    // Debounce generation for smooth scrolling
+    const timeoutId = setTimeout(async () => {
       setLoading(true);
-    }
 
-    const generateThumbs = async () => {
       try {
-        const results = await engine.generateThumbnails(videoPath, clipStartTime, clipEndTime, zoom, visibleStart, visibleEnd);
+        // Generate thumbnails with global time-grid sampling
+        const results = await engine.generateThumbnails(videoPath, clipStartTime, clipEndTime, pxPerSec, scrollLeft, viewportWidth);
 
         if (!cancelled) {
           setThumbnails(results);
-          setLoading(false);
+          prevCountRef.current = results.length;
         }
       } catch (error) {
         console.error("[useThumbnailEngine] Generation failed:", error);
+      } finally {
         if (!cancelled) {
           setLoading(false);
         }
       }
-    };
-
-    // Debounce generation
-    const timeoutId = setTimeout(generateThumbs, 100);
+    }, 100);
 
     return () => {
       cancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [videoPath, clipStartTime, clipEndTime, zoom, visibleStart, visibleEnd, pxPerSec]);
-
-  // Get time per thumbnail for positioning
-  const timePerThumbnail = engineRef.current.getTimePerThumbnail(zoom);
+  }, [videoPath, clipStartTime, clipEndTime, pxPerSec, scrollLeft, viewportWidth, timePerThumb]);
 
   return {
     thumbnails,
     loading,
-    timePerThumbnail,
+    timePerThumb,
     thumbnailWidth: THUMBNAIL_WIDTH,
-    zoom,
+    thumbCount: thumbnails.length,
   };
 }

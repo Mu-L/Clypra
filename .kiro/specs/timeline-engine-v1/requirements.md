@@ -2,11 +2,21 @@
 
 ## Introduction
 
-The Timeline Engine is a professional-grade video editing timeline system for the Kyro video editor. It provides frame-accurate editing capabilities, multi-layer composition, real-time scrubbing, and visual feedback similar to industry-standard tools like CapCut and Adobe Premiere Pro. The system enables users to arrange, trim, and manipulate video clips on a horizontal timeline with precise temporal control.
+The Timeline Engine is a professional-grade video editing timeline system for the Kyro video editor built with a React + Rust Tauri architecture. It provides frame-accurate editing capabilities, multi-layer composition, real-time scrubbing, and visual feedback similar to industry-standard tools like CapCut and Adobe Premiere Pro. The system follows the principle: **React = orchestration + UI, Rust = execution + media engine**.
+
+The architecture separates concerns into two layers:
+
+- **React Layer**: Timeline UI, viewport calculations, user interactions, and orchestration
+- **Rust Core**: Frame extraction, thumbnail generation, audio processing, render graph, and all heavy media operations
+
+This separation ensures optimal performance by keeping heavy media operations in native code while maintaining a responsive UI layer.
 
 ## Glossary
 
-- **Timeline_Engine**: The complete timeline system including state management, rendering, and user interactions
+- **Timeline_Engine**: The complete timeline system including React UI layer and Rust media engine
+- **React_Layer**: The UI layer responsible for timeline rendering, user interactions, viewport calculations, and state orchestration
+- **Rust_Core**: The native backend responsible for frame extraction, thumbnail generation, audio processing, and render operations
+- **Tauri_IPC**: The inter-process communication layer connecting React and Rust via commands and events
 - **Clip**: A video, audio, or text segment placed on the timeline with defined start time, duration, and track assignment
 - **Track**: A horizontal layer on the timeline that contains clips (video, audio, text, or effects)
 - **Playhead**: The vertical indicator showing the current playback position in time
@@ -16,39 +26,43 @@ The Timeline Engine is a professional-grade video editing timeline system for th
 - **Snap_System**: The magnetic alignment system that helps clips align to the playhead, other clips, or time markers
 - **Waveform**: Visual representation of audio amplitude over time
 - **Filmstrip**: Horizontal strip of video thumbnails representing visual content
-- **Coordinate_System**: The mapping between time (seconds) and horizontal position (pixels)
-- **State_Manager**: The centralized state management system (Zustand or similar) that maintains timeline data
-- **Video_Preview**: The video player component synchronized with the timeline playhead
-- **Export_Pipeline**: The FFmpeg-based system that renders the final video based on timeline edits
+- **Coordinate_System**: The mapping between time (seconds) and horizontal position (pixels) in the React_Layer
+- **State_Manager**: The centralized state management system (Zustand) in React_Layer that maintains timeline UI state
+- **Canvas_Renderer**: The React component that displays pre-rendered frames from Rust_Core
+- **Thumbnail_Engine**: The Rust component that extracts and caches video thumbnails using FFmpeg
+- **Frame_Extraction_Engine**: The Rust component that extracts individual frames at precise timestamps
+- **Audio_Engine**: The Rust component that decodes audio, provides timing authority, and mixes tracks
+- **Render_Graph**: The Rust component that generates FFmpeg filter graphs for video export
+- **Export_Pipeline**: The complete export system coordinating React_Layer and Rust_Core for final video rendering
 
 ## Requirements
 
-### Requirement 1: Timeline Coordinate System
+### Requirement 1: Timeline Coordinate System (React Layer)
 
 **User Story:** As a video editor, I want a consistent coordinate system, so that I can understand the relationship between time and visual position on the timeline.
 
 #### Acceptance Criteria
 
-1. THE Timeline_Engine SHALL map time values to horizontal pixel positions using the formula: `x = time * Pixels_Per_Second`
-2. THE Timeline_Engine SHALL map horizontal pixel positions to time values using the formula: `time = x / Pixels_Per_Second`
-3. WHEN the Pixels_Per_Second value changes, THE Timeline_Engine SHALL recalculate all clip positions while preserving their time values
-4. THE Timeline_Engine SHALL maintain a minimum Pixels_Per_Second value of 16 pixels per second
-5. THE Timeline_Engine SHALL maintain a maximum Pixels_Per_Second value of 320 pixels per second
-6. FOR ALL time-to-pixel conversions followed by pixel-to-time conversions, THE Timeline_Engine SHALL produce time values within 0.001 seconds of the original (round-trip property)
+1. THE React_Layer SHALL map time values to horizontal pixel positions using the formula: `x = time * Pixels_Per_Second`
+2. THE React_Layer SHALL map horizontal pixel positions to time values using the formula: `time = x / Pixels_Per_Second`
+3. WHEN the Pixels_Per_Second value changes, THE React_Layer SHALL recalculate all clip positions while preserving their time values
+4. THE React_Layer SHALL maintain a minimum Pixels_Per_Second value of 16 pixels per second
+5. THE React_Layer SHALL maintain a maximum Pixels_Per_Second value of 320 pixels per second
+6. FOR ALL time-to-pixel conversions followed by pixel-to-time conversions, THE React_Layer SHALL produce time values within 0.001 seconds of the original (round-trip property)
 
-### Requirement 2: Zoom Control
+### Requirement 2: Zoom Control (React Layer)
 
 **User Story:** As a video editor, I want to zoom in and out of the timeline, so that I can see fine details or get an overview of my project.
 
 #### Acceptance Criteria
 
-1. WHEN the user performs a pinch gesture on a trackpad, THE Timeline_Engine SHALL adjust the Pixels_Per_Second value proportionally to the gesture magnitude
-2. WHEN the user adjusts the zoom slider, THE Timeline_Engine SHALL update the Pixels_Per_Second value to match the slider position
-3. WHEN zooming occurs, THE Timeline_Engine SHALL keep the time value under the cursor position stable (zoom-to-cursor behavior)
-4. THE Timeline_Engine SHALL clamp zoom values between 16 and 320 pixels per second
-5. WHEN the Pixels_Per_Second value is below 26, THE Timeline_Engine SHALL hide tenth-second tick marks
-6. WHEN the Pixels_Per_Second value is below 70, THE Timeline_Engine SHALL hide frame tick marks
-7. WHEN the Pixels_Per_Second value is 70 or above AND pixels per frame is 11 or greater, THE Timeline_Engine SHALL display frame tick marks at 2-frame or 4-frame intervals
+1. WHEN the user performs a pinch gesture on a trackpad, THE React_Layer SHALL adjust the Pixels_Per_Second value proportionally to the gesture magnitude
+2. WHEN the user adjusts the zoom slider, THE React_Layer SHALL update the Pixels_Per_Second value to match the slider position
+3. WHEN zooming occurs, THE React_Layer SHALL keep the time value under the cursor position stable (zoom-to-cursor behavior)
+4. THE React_Layer SHALL clamp zoom values between 16 and 320 pixels per second
+5. WHEN the Pixels_Per_Second value is below 26, THE React_Layer SHALL hide tenth-second tick marks
+6. WHEN the Pixels_Per_Second value is below 70, THE React_Layer SHALL hide frame tick marks
+7. WHEN the Pixels_Per_Second value is 70 or above AND pixels per frame is 11 or greater, THE React_Layer SHALL display frame tick marks at 2-frame or 4-frame intervals
 
 ### Requirement 3: Time Ruler Display
 
@@ -65,19 +79,20 @@ The Timeline Engine is a professional-grade video editing timeline system for th
 7. THE Time_Ruler SHALL display time labels in HH:MM:SS format for times 60 minutes or longer
 8. WHEN Pixels_Per_Second is 26 or greater, THE Time_Ruler SHALL display tenth-second subdivision marks
 
-### Requirement 4: Playhead Control
+### Requirement 4: Playhead Control (React Layer)
 
 **User Story:** As a video editor, I want to control the playhead position, so that I can navigate to specific points in my video.
 
 #### Acceptance Criteria
 
-1. WHEN the user clicks on the timeline, THE Timeline_Engine SHALL move the Playhead to the clicked time position
-2. WHEN the user drags on the timeline, THE Timeline_Engine SHALL continuously update the Playhead position to follow the pointer
-3. THE Timeline_Engine SHALL synchronize the Playhead position with the Video_Preview current time
-4. WHEN the Video_Preview time updates during playback, THE Timeline_Engine SHALL update the Playhead visual position
-5. WHEN the Playhead moves outside the visible viewport, THE Timeline_Engine SHALL auto-scroll to keep the Playhead visible with a 15% margin
+1. WHEN the user clicks on the timeline, THE React_Layer SHALL move the Playhead to the clicked time position
+2. WHEN the user drags on the timeline, THE React_Layer SHALL continuously update the Playhead position to follow the pointer
+3. THE React_Layer SHALL synchronize the Playhead position with the Canvas_Renderer current time
+4. WHEN the Canvas_Renderer time updates during playback, THE React_Layer SHALL update the Playhead visual position
+5. WHEN the Playhead moves outside the visible viewport, THE React_Layer SHALL auto-scroll to keep the Playhead visible with a 15% margin
 6. THE Playhead SHALL be rendered as a vertical line with a triangular handle at the top
 7. THE Playhead SHALL remain visible when scrolling horizontally (positioned absolutely relative to viewport)
+8. WHEN the Playhead moves, THE React_Layer SHALL request the current frame from Rust_Core via extract_frame command
 
 ### Requirement 5: Clip Positioning
 
@@ -148,33 +163,36 @@ The Timeline Engine is a professional-grade video editing timeline system for th
 7. WHEN the user clicks a Track mute button, THE Timeline_Engine SHALL exclude the Track audio from playback and export
 8. THE Timeline_Engine SHALL allow users to reorder Tracks by dragging Track headers
 
-### Requirement 10: Waveform Visualization
+### Requirement 10: Waveform Visualization (Rust + React)
 
 **User Story:** As a video editor, I want to see audio waveforms, so that I can identify audio content and align clips to audio cues.
 
 #### Acceptance Criteria
 
-1. WHEN a Clip contains audio, THE Timeline_Engine SHALL generate a Waveform visualization
-2. THE Waveform SHALL display audio amplitude as a vertical envelope centered in the Clip audio region
-3. THE Timeline_Engine SHALL generate Waveform data by sampling audio peaks at regular intervals
-4. THE Timeline_Engine SHALL use a default of 1000 sample buckets for Waveform generation
-5. THE Waveform SHALL be rendered using HTML canvas for performance
-6. THE Waveform SHALL support high-DPI displays by scaling canvas resolution with device pixel ratio
-7. WHEN Waveform generation is in progress, THE Timeline_Engine SHALL display a loading indicator
+1. WHEN a Clip contains audio, THE React_Layer SHALL request waveform data from Rust_Core via generate_waveform command
+2. THE Audio_Engine SHALL generate waveform peak data by sampling audio amplitude at regular intervals
+3. THE Audio_Engine SHALL use a default of 1000 sample buckets for waveform generation
+4. THE Audio_Engine SHALL emit waveform_ready events when data is available
+5. THE React_Layer SHALL render the Waveform using HTML canvas for performance
+6. THE Waveform SHALL display audio amplitude as a vertical envelope centered in the Clip audio region
+7. THE React_Layer SHALL support high-DPI displays by scaling canvas resolution with device pixel ratio
+8. WHEN waveform generation is in progress, THE React_Layer SHALL display a loading indicator
 
-### Requirement 11: Filmstrip Visualization
+### Requirement 11: Filmstrip Visualization (Rust + React)
 
 **User Story:** As a video editor, I want to see video thumbnails on the timeline, so that I can identify visual content without playing the video.
 
 #### Acceptance Criteria
 
-1. WHEN a Clip contains video, THE Timeline_Engine SHALL generate a Filmstrip of thumbnails
-2. THE Filmstrip SHALL contain between 18 and 72 frames depending on Clip duration
-3. THE Timeline_Engine SHALL extract frames at evenly-spaced intervals across the Clip duration
-4. THE Filmstrip SHALL be rendered as a horizontal strip image with all frames side-by-side
-5. THE Filmstrip SHALL maintain the source video aspect ratio without distortion
-6. THE Timeline_Engine SHALL compress Filmstrip images as JPEG with 0.85 quality
-7. WHEN Filmstrip generation is in progress, THE Timeline_Engine SHALL display a loading indicator
+1. WHEN a Clip contains video, THE React_Layer SHALL request thumbnails from Rust_Core via get_thumbnails command
+2. THE Thumbnail_Engine SHALL extract frames at evenly-spaced intervals across the Clip duration
+3. THE Filmstrip SHALL contain between 18 and 72 frames depending on Clip duration and zoom level
+4. THE Thumbnail_Engine SHALL emit thumbnail_ready events as thumbnails become available
+5. THE React_Layer SHALL render thumbnails progressively as they arrive
+6. THE Filmstrip SHALL be rendered as a horizontal strip with all frames side-by-side
+7. THE Filmstrip SHALL maintain the source video aspect ratio without distortion
+8. THE Thumbnail_Engine SHALL compress thumbnails as JPEG with 0.85 quality
+9. WHEN thumbnail generation is in progress, THE React_Layer SHALL display a loading indicator
 
 ### Requirement 12: Clip Splitting
 
@@ -231,19 +249,20 @@ The Timeline Engine is a professional-grade video editing timeline system for th
 6. THE State_Manager SHALL notify subscribed components when state changes occur
 7. THE State_Manager SHALL serialize timeline state to JSON for saving and loading projects
 
-### Requirement 16: Performance Optimization
+### Requirement 16: Performance Optimization (React + Rust)
 
 **User Story:** As a video editor, I want smooth timeline performance, so that I can work efficiently with large projects.
 
 #### Acceptance Criteria
 
-1. WHEN the timeline contains more than 100 Clips, THE Timeline_Engine SHALL use virtualization to render only visible Clips
-2. THE Timeline_Engine SHALL use canvas rendering for Waveform visualization to minimize DOM nodes
-3. THE Timeline_Engine SHALL debounce scroll events to reduce render frequency
-4. THE Timeline_Engine SHALL memoize expensive calculations (ruler ticks, clip positions) based on dependencies
-5. THE Timeline_Engine SHALL cancel in-progress Filmstrip and Waveform generation when the source changes
-6. THE Timeline_Engine SHALL maintain 60 FPS during playhead scrubbing for timelines up to 1 hour duration
+1. WHEN the timeline contains more than 100 Clips, THE React_Layer SHALL use virtualization to render only visible Clips
+2. THE React_Layer SHALL use canvas rendering for Waveform visualization to minimize DOM nodes
+3. THE React_Layer SHALL debounce scroll events to reduce render frequency (16ms debounce)
+4. THE React_Layer SHALL memoize expensive calculations (ruler ticks, clip positions) based on dependencies
+5. THE Rust_Core SHALL cancel in-progress thumbnail and waveform generation when new requests arrive
+6. THE React_Layer SHALL maintain 60 FPS during playhead scrubbing for timelines up to 1 hour duration
 7. THE Timeline_Engine SHALL load and render a 100-clip timeline in under 2 seconds
+8. THE Rust_Core SHALL process thumbnail requests at a rate of at least 10 frames per second
 
 ### Requirement 17: Keyboard Shortcuts
 
@@ -262,21 +281,22 @@ The Timeline Engine is a professional-grade video editing timeline system for th
 9. WHEN the user presses Plus, THE Timeline_Engine SHALL zoom in
 10. WHEN the user presses Minus, THE Timeline_Engine SHALL zoom out
 
-### Requirement 18: Export Pipeline Integration
+### Requirement 18: Export Pipeline Integration (Rust + React)
 
 **User Story:** As a video editor, I want to export my edited timeline, so that I can share the final video.
 
 #### Acceptance Criteria
 
-1. WHEN the user initiates export, THE Export_Pipeline SHALL generate an FFmpeg command based on timeline state
-2. THE Export_Pipeline SHALL include trim operations for each Clip based on startTime and duration
-3. THE Export_Pipeline SHALL layer Clips according to Track order using FFmpeg filter_complex
-4. THE Export_Pipeline SHALL respect Track mute settings by excluding muted audio tracks
-5. THE Export_Pipeline SHALL respect Track visibility settings by excluding hidden video tracks
-6. THE Export_Pipeline SHALL execute the FFmpeg command via Tauri backend
-7. THE Export_Pipeline SHALL report progress percentage during export
-8. THE Export_Pipeline SHALL validate that all source media files exist before starting export
-9. IF any source media file is missing, THEN THE Export_Pipeline SHALL return a descriptive error message
+1. WHEN the user initiates export, THE React_Layer SHALL send timeline state to Rust_Core via render_project command
+2. THE Render_Graph SHALL generate an FFmpeg filter_complex graph based on timeline state
+3. THE Render_Graph SHALL include trim operations for each Clip based on startTime and duration
+4. THE Render_Graph SHALL layer Clips according to Track order using FFmpeg filter_complex
+5. THE Render_Graph SHALL respect Track mute settings by excluding muted audio tracks
+6. THE Render_Graph SHALL respect Track visibility settings by excluding hidden video tracks
+7. THE Rust_Core SHALL execute the FFmpeg command and emit render_progress events
+8. THE React_Layer SHALL display progress percentage based on render_progress events
+9. THE Rust_Core SHALL validate that all source media files exist before starting export
+10. IF any source media file is missing, THEN THE Rust_Core SHALL return a descriptive error message via render_error event
 
 ### Requirement 19: Multi-Clip Selection
 
@@ -375,3 +395,233 @@ The Timeline Engine is a professional-grade video editing timeline system for th
 5. THE Timeline_Engine SHALL keep the Playhead visible during scrolling by positioning it relative to the viewport
 6. WHEN the user scrolls, THE Timeline_Engine SHALL update the visible Clip range for virtualization
 7. THE Timeline_Engine SHALL maintain scroll position when zooming (except during zoom-to-cursor)
+
+### Requirement 26: Rust Thumbnail Engine
+
+**User Story:** As a video editor, I want fast thumbnail generation, so that I can see video content on the timeline without delays.
+
+#### Acceptance Criteria
+
+1. THE Thumbnail_Engine SHALL extract video frames using FFmpeg at specified timestamps
+2. THE Thumbnail_Engine SHALL cache extracted thumbnails on disk to avoid redundant extraction
+3. THE Thumbnail_Engine SHALL support multi-resolution thumbnail generation (low, medium, high quality)
+4. WHEN a thumbnail is requested, THE Thumbnail_Engine SHALL check the disk cache before extracting
+5. THE Thumbnail_Engine SHALL generate thumbnails asynchronously without blocking the UI thread
+6. THE Thumbnail_Engine SHALL emit thumbnail_ready events via Tauri_IPC when thumbnails are available
+7. THE Thumbnail_Engine SHALL prioritize thumbnail extraction based on proximity to the playhead
+8. THE Thumbnail_Engine SHALL extract thumbnails at a rate of at least 10 frames per second
+9. THE Thumbnail_Engine SHALL compress thumbnails as JPEG with configurable quality (default 0.85)
+
+### Requirement 27: Rust Frame Extraction Engine
+
+**User Story:** As a video editor, I want accurate frame extraction for preview, so that I can see the exact frame at the playhead position.
+
+#### Acceptance Criteria
+
+1. THE Frame_Extraction_Engine SHALL extract individual frames at precise timestamps using FFmpeg
+2. THE Frame_Extraction_Engine SHALL maintain frame accuracy within 1/60th of a second
+3. THE Frame_Extraction_Engine SHALL cache recently extracted frames in memory (LRU cache with 50 frame limit)
+4. THE Frame_Extraction_Engine SHALL support frame extraction from multiple video formats (MP4, MOV, AVI, MKV)
+5. WHEN a frame is requested via Tauri_IPC, THE Frame_Extraction_Engine SHALL return the frame data within 100ms for cached frames
+6. WHEN a frame is not cached, THE Frame_Extraction_Engine SHALL extract and return it within 500ms
+7. THE Frame_Extraction_Engine SHALL handle concurrent frame extraction requests using a thread pool
+8. THE Frame_Extraction_Engine SHALL return frames as raw RGBA pixel data or compressed JPEG based on request parameters
+
+### Requirement 28: Rust Audio Engine
+
+**User Story:** As a video editor, I want accurate audio playback and waveform generation, so that I can edit to audio cues.
+
+#### Acceptance Criteria
+
+1. THE Audio_Engine SHALL decode audio from video files using FFmpeg
+2. THE Audio_Engine SHALL generate waveform peak data by sampling audio amplitude at regular intervals
+3. THE Audio_Engine SHALL use a default of 1000 sample buckets for waveform generation
+4. THE Audio_Engine SHALL cache waveform data on disk to avoid redundant generation
+5. THE Audio_Engine SHALL support audio track mixing for multi-track playback
+6. THE Audio_Engine SHALL provide timing authority for audio-video synchronization
+7. THE Audio_Engine SHALL support audio formats including AAC, MP3, WAV, and FLAC
+8. WHEN waveform generation is requested via Tauri_IPC, THE Audio_Engine SHALL return peak data within 2 seconds for a 5-minute audio clip
+9. THE Audio_Engine SHALL emit waveform_ready events via Tauri_IPC when waveform data is available
+
+### Requirement 29: Rust Render Graph
+
+**User Story:** As a video editor, I want efficient video export, so that I can render my final video quickly.
+
+#### Acceptance Criteria
+
+1. THE Render_Graph SHALL generate FFmpeg filter_complex graphs from timeline state
+2. THE Render_Graph SHALL optimize the filter graph by combining adjacent operations
+3. THE Render_Graph SHALL support video layering based on track order
+4. THE Render_Graph SHALL support trim operations for each clip based on startTime and duration
+5. THE Render_Graph SHALL support audio mixing for multiple audio tracks
+6. THE Render_Graph SHALL respect track mute settings by excluding muted audio tracks
+7. THE Render_Graph SHALL respect track visibility settings by excluding hidden video tracks
+8. THE Render_Graph SHALL validate the filter graph before execution
+9. IF the filter graph is invalid, THEN THE Render_Graph SHALL return a descriptive error message via Tauri_IPC
+
+### Requirement 30: Tauri IPC Commands
+
+**User Story:** As a developer, I want a clear IPC interface, so that React and Rust can communicate efficiently.
+
+#### Acceptance Criteria
+
+1. THE Tauri_IPC SHALL provide a get_thumbnails command that accepts (video_path, timestamps, quality) and returns thumbnail data
+2. THE Tauri_IPC SHALL provide an extract_frame command that accepts (video_path, timestamp) and returns frame data
+3. THE Tauri_IPC SHALL provide a generate_waveform command that accepts (audio_path, sample_count) and returns peak data
+4. THE Tauri_IPC SHALL provide a render_project command that accepts (timeline_json, output_path, export_options) and initiates export
+5. THE Tauri_IPC SHALL provide a cancel_render command that stops an in-progress export
+6. THE Tauri_IPC SHALL provide a clear_cache command that removes cached thumbnails and frames
+7. ALL Tauri_IPC commands SHALL return results asynchronously using Rust async/await
+8. ALL Tauri_IPC commands SHALL include error handling and return descriptive error messages on failure
+9. THE Tauri_IPC SHALL validate all command parameters before execution
+
+### Requirement 31: Tauri IPC Events
+
+**User Story:** As a developer, I want event-based communication, so that Rust can notify React of asynchronous operations.
+
+#### Acceptance Criteria
+
+1. THE Tauri_IPC SHALL emit a thumbnail_ready event when a thumbnail is generated, including (video_path, timestamp, thumbnail_data)
+2. THE Tauri_IPC SHALL emit a waveform_ready event when waveform data is generated, including (audio_path, peak_data)
+3. THE Tauri_IPC SHALL emit a render_progress event during export, including (percentage, current_frame, total_frames)
+4. THE Tauri_IPC SHALL emit a render_complete event when export finishes successfully, including (output_path, duration)
+5. THE Tauri_IPC SHALL emit a render_error event when export fails, including (error_message, error_code)
+6. THE Tauri_IPC SHALL emit a cache_cleared event when cache is cleared, including (freed_bytes)
+7. THE React_Layer SHALL subscribe to all Tauri_IPC events and update UI state accordingly
+8. ALL Tauri_IPC events SHALL include a timestamp for debugging and logging purposes
+
+### Requirement 32: React Canvas Renderer
+
+**User Story:** As a video editor, I want smooth preview playback, so that I can see my edits in real-time.
+
+#### Acceptance Criteria
+
+1. THE Canvas_Renderer SHALL display frames received from the Frame_Extraction_Engine
+2. THE Canvas_Renderer SHALL render frames to an HTML canvas element
+3. THE Canvas_Renderer SHALL maintain the source video aspect ratio without distortion
+4. THE Canvas_Renderer SHALL support high-DPI displays by scaling canvas resolution with device pixel ratio
+5. THE Canvas_Renderer SHALL cache frames as ImageBitmap objects for fast rendering
+6. THE Canvas_Renderer SHALL clear the canvas when no frame is available
+7. THE Canvas_Renderer SHALL synchronize frame display with the playhead position
+8. THE Canvas_Renderer SHALL request frames from Rust_Core via Tauri_IPC when the playhead moves
+9. THE Canvas_Renderer SHALL maintain 60 FPS during playback for cached frames
+
+### Requirement 33: Performance - Virtualization
+
+**User Story:** As a video editor, I want smooth timeline performance with large projects, so that I can work efficiently.
+
+#### Acceptance Criteria
+
+1. WHEN the timeline contains more than 100 Clips, THE React_Layer SHALL render only clips visible in the viewport plus a 2-second buffer
+2. THE React_Layer SHALL calculate the visible time range based on scrollLeft and viewport width
+3. THE React_Layer SHALL update the visible clip range when scrolling occurs
+4. THE React_Layer SHALL use React.memo to prevent unnecessary re-renders of clip components
+5. THE React_Layer SHALL maintain 60 FPS during scrolling for timelines with up to 500 clips
+6. THE React_Layer SHALL debounce scroll events to reduce render frequency (16ms debounce)
+7. THE React_Layer SHALL load and render a 100-clip timeline in under 2 seconds
+
+### Requirement 34: Performance - Multi-Layer Caching
+
+**User Story:** As a video editor, I want fast frame access, so that scrubbing is responsive.
+
+#### Acceptance Criteria
+
+1. THE Rust_Core SHALL maintain a disk cache for thumbnails with LRU eviction policy
+2. THE Rust_Core SHALL maintain an in-memory frame cache with LRU eviction policy (50 frame limit)
+3. THE React_Layer SHALL maintain an ImageBitmap cache for rendered frames (30 frame limit)
+4. WHEN a frame is requested, THE Frame_Extraction_Engine SHALL check memory cache, then disk cache, then extract
+5. THE Rust_Core SHALL cache thumbnails with a maximum disk usage of 500MB per project
+6. THE Rust_Core SHALL evict least-recently-used cache entries when limits are exceeded
+7. THE React_Layer SHALL clear its ImageBitmap cache when memory pressure is detected
+8. THE Rust_Core SHALL persist cache metadata to enable cache reuse across application restarts
+
+### Requirement 35: Performance - Priority Queue
+
+**User Story:** As a video editor, I want frames near the playhead to load first, so that scrubbing is responsive.
+
+#### Acceptance Criteria
+
+1. THE Thumbnail_Engine SHALL prioritize thumbnail extraction based on distance from the playhead
+2. THE Thumbnail_Engine SHALL assign highest priority to thumbnails within 5 seconds of the playhead
+3. THE Thumbnail_Engine SHALL assign medium priority to thumbnails within 10 seconds of the playhead
+4. THE Thumbnail_Engine SHALL assign low priority to thumbnails beyond 10 seconds from the playhead
+5. WHEN the playhead moves, THE Thumbnail_Engine SHALL re-prioritize pending extraction requests
+6. THE Thumbnail_Engine SHALL cancel low-priority requests when high-priority requests are queued
+7. THE Frame_Extraction_Engine SHALL process frame requests in FIFO order (no priority queue for single frames)
+8. THE Thumbnail_Engine SHALL process at least 10 high-priority thumbnails per second
+
+### Requirement 36: Architecture - React Responsibilities
+
+**User Story:** As a developer, I want clear architectural boundaries, so that I know where to implement features.
+
+#### Acceptance Criteria
+
+1. THE React_Layer SHALL be responsible for timeline UI rendering (ruler, tracks, clips, playhead)
+2. THE React_Layer SHALL be responsible for user interaction handling (drag, trim, split, selection)
+3. THE React_Layer SHALL be responsible for viewport calculations (visible time range, clip positions)
+4. THE React_Layer SHALL be responsible for coordinate system math (time-to-pixel, pixel-to-time)
+5. THE React_Layer SHALL be responsible for UI state management using Zustand
+6. THE React_Layer SHALL NOT perform frame extraction, thumbnail generation, or audio processing
+7. THE React_Layer SHALL NOT execute FFmpeg commands or perform video encoding
+8. THE React_Layer SHALL orchestrate Rust_Core operations via Tauri_IPC commands
+
+### Requirement 37: Architecture - Rust Responsibilities
+
+**User Story:** As a developer, I want clear architectural boundaries, so that I know where to implement features.
+
+#### Acceptance Criteria
+
+1. THE Rust_Core SHALL be responsible for frame extraction using FFmpeg
+2. THE Rust_Core SHALL be responsible for thumbnail generation and caching
+3. THE Rust_Core SHALL be responsible for audio decoding and waveform generation
+4. THE Rust_Core SHALL be responsible for render graph generation and video export
+5. THE Rust_Core SHALL be responsible for all disk I/O operations (cache management, file reading)
+6. THE Rust_Core SHALL be responsible for all FFmpeg integration
+7. THE Rust_Core SHALL NOT perform UI rendering or user interaction handling
+8. THE Rust_Core SHALL NOT manage timeline UI state (clips, tracks, playhead position)
+9. THE Rust_Core SHALL expose all functionality via Tauri_IPC commands and events
+
+### Requirement 38: Evolution Plan - v1 MVP
+
+**User Story:** As a developer, I want a clear evolution plan, so that I can build incrementally.
+
+#### Acceptance Criteria
+
+1. THE v1 MVP SHALL use JavaScript Canvas_Renderer for preview display
+2. THE v1 MVP SHALL use basic thumbnail extraction without priority queue
+3. THE v1 MVP SHALL use simple audio-video synchronization based on playhead time
+4. THE v1 MVP SHALL support single-track video and audio editing
+5. THE v1 MVP SHALL support basic export using FFmpeg filter_complex
+6. THE v1 MVP SHALL implement disk caching for thumbnails
+7. THE v1 MVP SHALL implement in-memory caching for frames (50 frame limit)
+8. THE v1 MVP SHALL provide get_thumbnails, extract_frame, and render_project Tauri commands
+
+### Requirement 39: Evolution Plan - v1.5 Enhancements
+
+**User Story:** As a developer, I want a clear evolution plan, so that I can build incrementally.
+
+#### Acceptance Criteria
+
+1. THE v1.5 SHALL implement the Rust Thumbnail_Engine with async streaming
+2. THE v1.5 SHALL implement priority-based thumbnail extraction
+3. THE v1.5 SHALL implement thumbnail_ready events for progressive loading
+4. THE v1.5 SHALL implement multi-resolution thumbnail support
+5. THE v1.5 SHALL implement waveform generation in Rust_Core
+6. THE v1.5 SHALL implement waveform_ready events
+7. THE v1.5 SHALL optimize cache eviction policies based on usage patterns
+8. THE v1.5 SHALL support multi-track video and audio editing
+
+### Requirement 40: Evolution Plan - v2 Advanced Features
+
+**User Story:** As a developer, I want a clear evolution plan, so that I can build incrementally.
+
+#### Acceptance Criteria
+
+1. THE v2 SHALL implement a Rust playback engine for real-time preview
+2. THE v2 SHALL implement audio-driven clock for precise audio-video sync
+3. THE v2 SHALL implement GPU-accelerated rendering using wgpu or similar
+4. THE v2 SHALL implement real-time effects preview
+5. THE v2 SHALL implement background rendering for export
+6. THE v2 SHALL implement render queue for batch exports
+7. THE v2 SHALL implement hardware-accelerated video decoding
+8. THE v2 SHALL support 4K and higher resolution editing
