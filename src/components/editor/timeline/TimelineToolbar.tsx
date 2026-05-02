@@ -1,41 +1,35 @@
-import React, { useState } from 'react'
-import { Plus, MousePointer2, Scissors, Magnet, Link2, Mic, Search, ZoomIn, ZoomOut } from 'lucide-react'
-import { Button } from '../../ui/Button'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/Tooltip'
-import { useTimelineStore } from '../../../store/timelineStore'
+import React, { useState } from "react";
+import { Plus, MousePointer2, Scissors, Magnet, Link2, Mic, Search, ZoomIn, ZoomOut } from "lucide-react";
+import { Button } from "../../ui/Button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../ui/Tooltip";
+import { useTimelineStore } from "../../../store/timelineStore";
 
 export const TimelineToolbar: React.FC = () => {
-  const { zoomLevel, setZoom, addTrack } = useTimelineStore()
-  const [snapMode, setSnapMode] = useState(true)
-  const [splitMode, setSplitMode] = useState(false)
-  const [linkMode, setLinkMode] = useState(true)
+  const { zoomLevel, setZoom, addTrack } = useTimelineStore();
+  const [snapMode, setSnapMode] = useState(true);
+  const [splitMode, setSplitMode] = useState(false);
+  const [linkMode, setLinkMode] = useState(true);
 
   const handleZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setZoom(Number(e.target.value))
-  }
+    setZoom(Number(e.target.value));
+  };
 
-  const toolButton = 'text-text-muted hover:text-text-primary hover:bg-surface-raised/80'
-  const activeButton = 'bg-cyan-500/15 text-cyan-300 border-cyan-400/40 hover:bg-cyan-500/20'
+  const toolButton = "text-text-muted hover:text-text-primary hover:bg-surface-raised/80";
+  const activeButton = "bg-cyan-500/15 text-cyan-300 border-cyan-400/40 hover:bg-cyan-500/20";
 
-  const Tool = ({
-    label,
-    children,
-  }: {
-    label: string
-    children: React.ReactNode
-  }) => (
+  const Tool = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent sideOffset={6}>{label}</TooltipContent>
     </Tooltip>
-  )
+  );
 
   return (
     <TooltipProvider>
-      <div className="h-12 bg-[#1a1c20] border-b border-[#2c2f34] flex items-center px-3 gap-2">
+      <div className="h-12 border-b border-[#2c2f34] flex items-center px-3 gap-2">
         <div className="flex items-center gap-1">
           <Tool label="Add video track">
-            <Button variant="ghost" size="icon-sm" className={toolButton} onClick={() => addTrack('video')}>
+            <Button variant="ghost" size="icon-sm" className={toolButton} onClick={() => addTrack("video")}>
               <Plus className="w-4 h-4" />
             </Button>
           </Tool>
@@ -90,5 +84,5 @@ export const TimelineToolbar: React.FC = () => {
         </div>
       </div>
     </TooltipProvider>
-  )
-}
+  );
+};

@@ -20,7 +20,6 @@ export const Timeline: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  const totalHeight = tracks.reduce((sum, t) => sum + t.height, 0);
   const contentWidth = Math.max(1000, duration * pixelsPerSecond);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -220,10 +219,10 @@ export const Timeline: React.FC = () => {
 
         <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-x-auto overflow-y-auto scrollbar-thin px-1 relative">
           {/* Visual feedback overlay when dragging over timeline */}
-          <div className={`absolute inset-0 duration-300 transition-colors pointer-events-none ${isDraggingOver ? "bg-surface-raised/80" : ""}`} style={{ zIndex: isDraggingOver ? 10 : -1 }} />
+          <div className={`absolute inset-0 duration-300 transition-colors pointer-events-none ${isDraggingOver ? "bg-surface-raised/10" : ""}`} style={{ zIndex: isDraggingOver ? 10 : -1 }} />
 
           {clips.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#1b1f25]">
+            <div className="absolute inset-0 flex items-center justify-center">
               <div className="flex items-center gap-3 text-[#6b7280] pointer-events-none">
                 <FolderOpen className="w-5 h-5" />
                 <span className="text-sm">Drag material here and start to create</span>
@@ -235,7 +234,7 @@ export const Timeline: React.FC = () => {
                 width: `${contentWidth}px`,
                 minHeight: "100%",
               }}
-              className="bg-[#1b1f25] relative flex flex-col justify-end"
+              className="relative flex flex-col justify-end"
             >
               <TimelineRuler pixelsPerSecond={pixelsPerSecond} scrollLeft={scrollLeft} onSeek={seek} />
 
