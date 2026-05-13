@@ -70,6 +70,8 @@ export function useFilmstrip(opts: UseFilmstripOptions): UseFilmstripResult {
   const runtime = useRenderRuntime();
   const renderState = useRenderState(clipId);
 
+  console.log("[USEFILMSTRIP] Runtime exists:", !!runtime);
+
   // Extract primitive values to avoid object reference issues in dependencies
   const epochId = renderState.epochId;
   const spatialTier = renderState.currentTier.spatialTier;

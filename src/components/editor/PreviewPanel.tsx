@@ -481,26 +481,64 @@ const ProgramPreview: React.FC = () => {
     };
   }, [useCanvasPreview, clips, tracks, mediaAssets, project, epoch, clock, displayWidth, displayHeight]);
 
-  // Video sync - EVENT DRIVEN (only on state changes, not every frame)
+  // Create/destroy video elements (only when scene changes)
   useEffect(() => {
-    const currentClockTime = clock.time;
-    const registeredKeys = new Set<string>();
+    const currentVideoKeys = new Set<string>();
 
+    // Register video elements with session
     Object.values(videoRefs.current).forEach((video) => {
       if (!video) return;
 
-      // Register video element with session for lifecycle management
-      // ✅ Get session NOW (not captured in closure)
       const session = getActiveSessionOrNull();
+
+      console.log(session);
+
       if (session && session.state === "active") {
         const clipId = video.dataset.clipId;
         const mediaId = video.dataset.mediaId;
         if (clipId && mediaId) {
           const key = `${clipId}-${mediaId}`;
           session.registerVideoElement(key, video);
-          registeredKeys.add(key);
+          currentVideoKeys.add(key);
         }
       }
+    });
+
+    // Cleanup: ONLY on unmount or when scene changes
+    return () => {
+      const session = getActiveSessionOrNull();
+      if (session) {
+        currentVideoKeys.forEach((key) => {
+          session.unregisterVideoElement(key);
+        });
+      }
+
+      // Only cleanup videos that are no longer in the scene
+      Object.entries(videoRefs.current).forEach(([key, video]) => {
+        if (!video) return;
+        const clipId = video.dataset.clipId;
+        const mediaId = video.dataset.mediaId;
+        const videoKey = `${clipId}-${mediaId}`;
+
+        // Only cleanup if this video is not in current scene
+        const stillInScene = scene.visualLayers.some((l) => l.layerType === "media" && l.clipId === clipId && l.mediaId === mediaId);
+
+        if (!stillInScene) {
+          video.pause();
+          video.src = "";
+          video.load();
+          delete videoRefs.current[key];
+        }
+      });
+    };
+  }, [scene.metadata.activeMediaHash]); // Only re-run when scene content changes
+
+  // Sync video playback state (doesn't touch src)
+  useEffect(() => {
+    const currentClockTime = clock.time;
+
+    Object.values(videoRefs.current).forEach((video) => {
+      if (!video) return;
 
       // Audio settings
       video.muted = isMuted || volume === 0;
@@ -514,15 +552,13 @@ const ProgramPreview: React.FC = () => {
 
         if (clip) {
           const clipLocalTime = currentClockTime - clip.startTime;
-          const trimIn = clip.trimIn || 0; // Default to 0 if undefined
+          const trimIn = clip.trimIn || 0;
           const sourceTime = trimIn + clipLocalTime;
           const targetTime = Math.max(0, Math.min(sourceTime, Math.max(0, video.duration - 0.01)));
 
-          // Set time when paused or when starting playback
           if (clockState.state !== "playing") {
             video.currentTime = targetTime;
           } else if (video.paused) {
-            // Starting playback - set initial time
             video.currentTime = targetTime;
           }
         }
@@ -530,13 +566,11 @@ const ProgramPreview: React.FC = () => {
 
       // Play/pause based on clock state
       if (clockState.state === "playing") {
-        console.log("READY STATE: ", video.readyState);
-        if (video.paused && video.readyState >= 2) {
-          // Only play if video has enough data (HAVE_CURRENT_DATA or better)
+        if (video.paused) {
+          // Remove readyState check - let browser queue the play
           const playPromise = video.play();
           if (playPromise !== undefined) {
             playPromise.catch((err) => {
-              // Ignore AbortError - it's expected when rapidly seeking or changing state
               if (err.name !== "AbortError") {
                 console.warn("video.play() failed:", err);
               }
@@ -550,25 +584,8 @@ const ProgramPreview: React.FC = () => {
       }
     });
 
-    // Cleanup: unregister video elements and cleanup DOM resources
-    return () => {
-      // ✅ Get session at cleanup time (not from closure)
-      const session = getActiveSessionOrNull();
-      if (session) {
-        registeredKeys.forEach((key) => {
-          session.unregisterVideoElement(key);
-        });
-      }
-
-      // ✅ ALWAYS cleanup DOM resources, even if session is gone
-      Object.values(videoRefs.current).forEach((video) => {
-        if (!video) return;
-        video.pause();
-        video.src = "";
-        video.load();
-      });
-    };
-  }, [clockState.state, isMuted, volume, clockState.speed, clips, clock, previewVideoReadyTick, scene.metadata.activeMediaHash]);
+    // NO cleanup here - videos persist across playback state changes
+  }, [clockState.state, isMuted, volume, clockState.speed, clips, clock, previewVideoReadyTick]);
 
   // Continuous drift correction via RAF (replaces 250ms interval for frame-accurate sync)
   useEffect(() => {
@@ -671,6 +688,8 @@ const ProgramPreview: React.FC = () => {
   const frameRate = clockState.frameRate;
   const step = 1 / Math.max(1, frameRate);
 
+  // console.log(scene);
+
   return (
     <div className="flex-1 bg-bg flex flex-col min-h-0 rounded-tl-xl border-l border-t border-white/3">
       {/* ── Header ─────────────────────────────────────────────────── */}
@@ -709,22 +728,24 @@ const ProgramPreview: React.FC = () => {
                 <div className="absolute top-0 left-0 pointer-events-none -z-10" style={{ width: "16px", height: "16px", opacity: 0.01, visibility: "hidden", overflow: "hidden" }}>
                   {scene.visualLayers
                     .filter((l): l is EvaluatedMediaLayer => l.layerType === "media" && l.mediaType === "video")
-                    .map((layer) => (
-                      <video
-                        key={`audio-${layer.clipId}-${layer.mediaId}`}
-                        data-media-id={layer.mediaId}
-                        data-clip-id={layer.clipId}
-                        ref={(el) => {
-                          videoRefs.current[`${layer.clipId}-${layer.mediaId}`] = el;
-                        }}
-                        src={layer.sourcePath}
-                        muted={isMuted || volume === 0}
-                        playsInline
-                        preload="auto"
-                        onLoadedMetadata={() => setPreviewVideoReadyTick((n) => n + 1)}
-                        className="w-full h-full"
-                      />
-                    ))}
+                    .map((layer) => {
+                      return (
+                        <video
+                          key={`audio-${layer.clipId}-${layer.mediaId}`}
+                          data-media-id={layer.mediaId}
+                          data-clip-id={layer.clipId}
+                          ref={(el) => {
+                            videoRefs.current[`${layer.clipId}-${layer.mediaId}`] = el;
+                          }}
+                          src={layer.sourcePath}
+                          muted={isMuted || volume === 0}
+                          playsInline
+                          preload="auto"
+                          onLoadedMetadata={() => setPreviewVideoReadyTick((n) => n + 1)}
+                          className="w-full h-full"
+                        />
+                      );
+                    })}
                 </div>
               </>
             ) : (

@@ -80,7 +80,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }
   },
 
-  createProject: (name, aspectRatio, frameRate) => {
+  createProject: async (name, aspectRatio, frameRate) => {
     const dims = getAspectRatioDimensions(aspectRatio);
     const project: Project = {
       id: generateId("project"),
@@ -96,19 +96,26 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ project, mediaAssets: [] });
 
     // Let timelineStore reset its own state
-    import("./timelineStore")
-      .then(({ useTimelineStore }) => {
-        useTimelineStore.getState().hydrateFromProject({ tracks: [], clips: [] });
-      })
-      .catch((err) => {
-        console.error("[CreateProject] Failed to hydrate timeline:", err);
-      });
+    try {
+      const { useTimelineStore } = await import("./timelineStore");
+      useTimelineStore.getState().hydrateFromProject({ tracks: [], clips: [] });
+    } catch (err) {
+      console.error("[CreateProject] Failed to hydrate timeline:", err);
+    }
+
+    // Initialize runtime session
+    try {
+      const { createProjectSession } = await import("../core/runtime/ProjectSession");
+      await createProjectSession(project.id);
+    } catch (err) {
+      console.error("[CreateProject] Runtime initialization failed:", err);
+    }
 
     get().scheduleAutoSave();
   },
 
   loadProject: async (project, payload) => {
-    // 1. Dispose previous runtime first
+    // Dispose previous runtime first
     try {
       const { disposeActiveSession } = await import("../core/runtime/ProjectSession");
       await disposeActiveSession();
@@ -116,10 +123,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       console.error("[LoadProject] Runtime disposal failed:", err);
     }
 
-    // 2. Apply project and mediaAssets (projectStore owns these)
+    // Apply project and mediaAssets (projectStore owns these)
     set({ project, mediaAssets: payload?.mediaAssets ?? [] });
 
-    // 3. Let timelineStore hydrate its own state (respects ownership boundary)
+    // Let timelineStore hydrate its own state (respects ownership boundary)
     try {
       const { useTimelineStore } = await import("./timelineStore");
       useTimelineStore.getState().hydrateFromProject({
@@ -132,7 +139,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       import("./timelineStore").then(({ useTimelineStore }) => useTimelineStore.getState().hydrateFromProject({ tracks: [], clips: [] })).catch((resetErr) => console.error("[LoadProject] Failed to reset timeline:", resetErr));
     }
 
-    // 4. Initialize runtime LAST — stores are now fully populated
+    // Initialize runtime LAST — stores are now fully populated
     try {
       const { createProjectSession } = await import("../core/runtime/ProjectSession");
       await createProjectSession(project.id);

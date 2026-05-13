@@ -52,6 +52,8 @@ export function useRenderState(clipId: string): RenderState {
   const unsubRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    console.log("[HOOKS] Runtime exists:", !!runtime);
+
     if (!runtime) {
       setState(defaultRenderState(clipId));
       return;
