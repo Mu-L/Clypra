@@ -36,6 +36,8 @@ jobs:
   test-rust:
     name: Test Rust Backend
     runs-on: ubuntu-latest
+    env:
+      PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig
 
     steps:
       - name: Checkout code
@@ -71,13 +73,9 @@ jobs:
           workspaces: src-tauri
 
       - name: Run Rust tests
-        env:
-          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig
         run: cd src-tauri && cargo test
 
       - name: Run Clippy
-        env:
-          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig
         run: cd src-tauri && cargo clippy -- -D warnings
 
   build-check:

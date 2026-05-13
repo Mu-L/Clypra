@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Film, Image as ImageIcon, Plus, Trash2, Clock, ChevronRight, Sparkles } from "lucide-react";
+import { Film, Image as ImageIcon, Plus, Trash2, Pencil, MoreHorizontal, Clock, ChevronRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useProjectStore } from "@/store/projectStore";
@@ -29,9 +29,14 @@ const getProjectThumbnail = (project: Project) => {
 };
 
 export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onProjectCreate, onProjectOpen }) => {
-  const { recentProjects, setRecentProjects, deleteProject } = useProjectStore();
+  const { recentProjects, setRecentProjects, deleteProject, renameProject } = useProjectStore();
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [projectToRename, setProjectToRename] = useState<Project | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadRecentProjects = async () => {
@@ -79,8 +84,46 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onProjectCreate, onP
 
   const handleDeleteClick = (e: React.MouseEvent, project: Project) => {
     e.stopPropagation();
+    setMenuOpen(null);
     setProjectToDelete(project);
   };
+
+  const handleRenameClick = (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation();
+    setMenuOpen(null);
+    setProjectToRename(project);
+    setRenameValue(project.name);
+  };
+
+  const handleConfirmRename = async () => {
+    if (!projectToRename || !renameValue.trim()) return;
+    setIsRenaming(true);
+    try {
+      await renameProject(projectToRename.id, renameValue.trim());
+      setProjectToRename(null);
+    } catch (error) {
+      console.error("Failed to rename project:", error);
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  const handleToggleMenu = (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation();
+    setMenuOpen((prev) => (prev === projectId ? null : projectId));
+  };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
 
   const handleConfirmDelete = async () => {
     if (!projectToDelete) return;
@@ -218,9 +261,25 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onProjectCreate, onP
                       </div>
                     </div>
 
-                    {/* Delete button */}
-                    <div onClick={(e) => handleDeleteClick(e, project)} className="absolute top-2 left-2 p-1.5 rounded-lg bg-bg/80 backdrop-blur-sm border border-white/[0.04] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-danger/20 hover:border-danger/30 cursor-pointer" title="Delete project">
-                      <Trash2 className="w-3.5 h-3.5 text-text-muted hover:text-danger transition-colors" />
+                    {/* More options button */}
+                    <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div onClick={(e) => handleToggleMenu(e, project.id)} className="p-1.5 rounded-lg bg-bg/80 backdrop-blur-sm border border-white/[0.04] hover:bg-surface-raised hover:border-white/[0.08] cursor-pointer transition-colors" title="More options">
+                        <MoreHorizontal className="w-3.5 h-3.5 text-text-muted" />
+                      </div>
+
+                      {/* Dropdown menu */}
+                      {menuOpen === project.id && (
+                        <div ref={menuRef} className="absolute top-full left-0 mt-1 z-50 min-w-[140px] rounded-lg border border-border bg-surface py-1 shadow-xl overflow-hidden">
+                          <button onClick={(e) => handleRenameClick(e, project)} className="w-full px-3 py-2 text-left flex items-center gap-2 text-sm text-text-primary hover:bg-surface-raised transition-colors">
+                            <Pencil className="w-3.5 h-3.5" />
+                            Rename
+                          </button>
+                          <button onClick={(e) => handleDeleteClick(e, project)} className="w-full px-3 py-2 text-left flex items-center gap-2 text-sm text-danger hover:bg-surface-raised transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </button>
                 );
@@ -229,6 +288,31 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onProjectCreate, onP
           )}
         </section>
       </div>
+
+      {/* Rename Modal */}
+      <Modal isOpen={!!projectToRename} onClose={() => setProjectToRename(null)} title="Rename Project">
+        <div className="p-5 space-y-4">
+          <input
+            type="text"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleConfirmRename();
+            }}
+            autoFocus
+            className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm text-text-primary focus:outline-none focus:border-accent transition-colors"
+            placeholder="Project name"
+          />
+          <div className="flex gap-3 justify-end pt-2">
+            <Button variant="ghost" onClick={() => setProjectToRename(null)} disabled={isRenaming}>
+              Cancel
+            </Button>
+            <Button variant="default" onClick={handleConfirmRename} disabled={isRenaming || !renameValue.trim()}>
+              {isRenaming ? "Renaming..." : "Rename"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <Modal isOpen={!!projectToDelete} onClose={() => setProjectToDelete(null)} title="Delete Project">

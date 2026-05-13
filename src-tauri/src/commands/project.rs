@@ -78,6 +78,32 @@ pub fn get_recent_projects(app: tauri::AppHandle) -> Result<Vec<String>, String>
 }
 
 #[tauri::command]
+pub fn rename_project(app: tauri::AppHandle, project_id: String, new_name: String) -> Result<(), String> {
+    let projects_dir = get_projects_dir(&app)?;
+    let file_path = projects_dir.join(format!("{}.json", project_id));
+
+    if !file_path.exists() {
+        return Err(format!("Project file not found: {}", project_id));
+    }
+
+    let content = fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to read project: {}", e))?;
+
+    let mut project: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Invalid project JSON: {}", e))?;
+
+    project["name"] = serde_json::Value::String(new_name);
+
+    let updated = serde_json::to_string(&project)
+        .map_err(|e| format!("Failed to serialize project: {}", e))?;
+
+    fs::write(&file_path, updated)
+        .map_err(|e| format!("Failed to save project: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
 pub fn delete_project(app: tauri::AppHandle, project_id: String) -> Result<(), String> {
     let projects_dir = get_projects_dir(&app)?;
     let file_path = projects_dir.join(format!("{}.json", project_id));

@@ -45,6 +45,7 @@ interface ProjectStore {
   removeMediaAsset: (assetId: string) => void;
   updateProject: (updates: Partial<Project>) => void;
   setRecentProjects: (projects: Project[]) => void;
+  renameProject: (projectId: string, newName: string) => Promise<void>;
   deleteProject: (projectId: string) => Promise<void>;
   closeProject: () => Promise<void> | void;
   scheduleAutoSave: () => void;
@@ -185,6 +186,32 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   setRecentProjects: (projects) => {
     set({ recentProjects: projects });
+  },
+
+  renameProject: async (projectId, newName) => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("rename_project", { projectId, newName });
+
+      // Update in recent projects list
+      set((state) => ({
+        recentProjects: state.recentProjects.map((p) => (p.id === projectId ? { ...p, name: newName } : p)),
+      }));
+
+      // If this project is currently open, update it too
+      const currentProject = get().project;
+      if (currentProject && currentProject.id === projectId) {
+        set((state) => ({
+          project: state.project ? { ...state.project, name: newName } : null,
+        }));
+      }
+
+      get().showToast("Project renamed");
+    } catch (error) {
+      console.error("[RenameProject] Failed to rename project:", error);
+      get().showToast("Failed to rename project", "error");
+      throw error;
+    }
   },
 
   deleteProject: async (projectId) => {
