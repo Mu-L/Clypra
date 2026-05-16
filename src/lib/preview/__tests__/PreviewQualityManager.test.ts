@@ -33,8 +33,8 @@ describe("PreviewQualityManager", () => {
     });
 
     const profile = manager.getRenderProfile(PreviewQualityTier.Idle);
-    expect(profile.maxWidth).toBe(1800); // 600 × 3, NOT 3840 × 3
-    expect(profile.maxHeight).toBe(1014); // 338 × 3
+    expect(profile.maxWidth).toBe(1800); // viewport-capped, preserving 16:9 aspect ratio
+    expect(profile.maxHeight).toBe(1012); // 2160 × (1800 / 3840), NOT 338 × 3
   });
 
   it("playback tier uses half res without DPR", () => {

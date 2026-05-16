@@ -145,8 +145,8 @@ export class GPUTextureCache {
   }
 
   /**
-   * Render texture to canvas (reuse, no upload)
-   * Simplified fullscreen rendering without matrix transforms
+   * Render texture to canvas at specified sub-rectangle (reuse, no upload).
+   * Handles letterboxing by drawing a quad that only covers the given rectangle.
    */
   renderTexture(key: string, x: number, y: number, width: number, height: number) {
     const texture = this.textures.get(key);
@@ -165,10 +165,21 @@ export class GPUTextureCache {
       return;
     }
 
-    // Update viewport if canvas size changed
     const canvasWidth = this.gl.canvas.width;
     const canvasHeight = this.gl.canvas.height;
     this.gl.viewport(0, 0, canvasWidth, canvasHeight);
+
+    // Compute clip-space bounds for the destination rectangle.
+    // Canvas pixel (0,0) is top-left; WebGL clip-space (-1,-1) is bottom-left.
+    const clipLeft = (x / canvasWidth) * 2 - 1;
+    const clipRight = ((x + width) / canvasWidth) * 2 - 1;
+    const clipTop = ((canvasHeight - y) / canvasHeight) * 2 - 1;
+    const clipBottom = ((canvasHeight - y - height) / canvasHeight) * 2 - 1;
+
+    // Build sub-rectangle quad with flipped-Y texCoords (ImageBitmap origin is top-left)
+    const vertices = new Float32Array([clipLeft, clipBottom, 0, 1, clipRight, clipBottom, 1, 1, clipLeft, clipTop, 0, 0, clipRight, clipTop, 1, 0]);
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.DYNAMIC_DRAW);
 
     // Use shader program
     this.gl.useProgram(this.program);
@@ -179,15 +190,12 @@ export class GPUTextureCache {
     this.gl.uniform1i(this.textureLocation, 0);
 
     // Set up vertex attributes
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-
     this.gl.enableVertexAttribArray(this.positionLocation);
     this.gl.vertexAttribPointer(this.positionLocation, 2, this.gl.FLOAT, false, 16, 0);
 
     this.gl.enableVertexAttribArray(this.texCoordLocation);
     this.gl.vertexAttribPointer(this.texCoordLocation, 2, this.gl.FLOAT, false, 16, 8);
 
-    // Draw fullscreen quad (no matrix transform needed)
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
   }
 

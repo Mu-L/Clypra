@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Film, Image as ImageIcon, Plus, Trash2, Pencil, MoreHorizontal, Clock, ChevronRight, Sparkles } from "lucide-react";
+import { Film, Image as ImageIcon, Plus, Trash2, Pencil, MoreHorizontal, Clock, ChevronRight, Sparkles, Settings } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useProjectStore } from "@/store/projectStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import type { AspectRatio, MediaAsset, Project } from "@/types";
 import { MAX_PROJECT_NAME_LENGTH } from "@/types";
+import { useUIStore } from "@/store/uiStore";
 
 interface LaunchScreenProps {
   onProjectCreate: (name: string, aspectRatio: AspectRatio, frameRate: 24 | 30 | 60) => void;
@@ -41,6 +42,7 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onProjectCreate, onP
   const [isRenaming, setIsRenaming] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
+  const { toggleSettingsModal } = useUIStore();
 
   useEffect(() => {
     const loadRecentProjects = async () => {
@@ -83,7 +85,7 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onProjectCreate, onP
 
   const handleStartNewProject = () => {
     const { defaultFrameRate } = useSettingsStore.getState();
-    onProjectCreate("Untitled Project", "9:16", defaultFrameRate);
+    onProjectCreate("Untitled Project", "16:9", defaultFrameRate);
   };
 
   const handleDeleteClick = (e: React.MouseEvent, project: Project) => {
@@ -182,7 +184,10 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onProjectCreate, onP
               <p className="text-[11px] text-text-muted font-medium tracking-wide">VIDEO EDITOR</p>
             </div>
           </div>
-          <span className="text-[10px] text-text-muted/50 font-mono">v0.1.0-dev</span>
+          {/* <span className="text-[10px] text-text-muted/50 font-mono">v0.1.0-dev</span> */}
+          <Button variant="ghost" size="icon-sm" onClick={toggleSettingsModal} title="Settings" style={{ WebkitAppRegion: "no-drag", cursor: "pointer" } as React.CSSProperties}>
+            <Settings className="w-3.5 h-3.5" />
+          </Button>
         </header>
 
         {/* ── Hero / New Project ────────────────────────────────── */}
@@ -209,9 +214,9 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onProjectCreate, onP
                 Create something amazing
               </div>
               <h2 className="text-2xl md:text-3xl font-bold text-text-primary mb-2 tracking-tight">Start a new project</h2>
-              <p className="text-sm text-text-muted mb-6 max-w-md">Begin with a 9:16 portrait canvas optimized for social media, or open a recent project below.</p>
-              <Button variant="default" size="lg" onClick={handleStartNewProject} className="px-8 py-3 text-base font-semibold rounded-xl shadow-lg shadow-accent/20 hover:shadow-accent/30 transition-shadow">
-                <Plus className="w-5 h-5 mr-2" />
+              <p className="text-sm text-text-muted mb-6 max-w-md">Begin with a 16:9 landscape canvas optimized for YouTube and widescreen content, or open a recent project below.</p>
+              <Button variant="default" size="lg" onClick={handleStartNewProject} className="py-2 px-4 text-base font-semibold rounded-xl transition-all cursor-pointer">
+                <Plus className="mr-1" />
                 New Project
               </Button>
             </div>
@@ -236,7 +241,19 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onProjectCreate, onP
               {recentProjects.map((project) => {
                 const thumbnail = getProjectThumbnail(project);
                 return (
-                  <button key={project.id} onClick={() => onProjectOpen(project)} className="group relative text-left rounded-xl border border-white/4 bg-surface hover:bg-surface-raised transition-all duration-200 hover:-translate-y-0.5 hover:border-white/8 hover:shadow-lg hover:shadow-black/20 overflow-hidden">
+                  <div
+                    key={project.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onProjectOpen(project)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onProjectOpen(project);
+                      }
+                    }}
+                    className="group relative text-left rounded-xl border border-white/4 bg-surface hover:bg-surface-raised transition-all duration-200 hover:-translate-y-0.5 hover:border-white/8 hover:shadow-lg hover:shadow-black/20 overflow-hidden cursor-pointer"
+                  >
                     {/* Thumbnail area */}
                     <div className="h-[170px] bg-bg flex items-center justify-center relative overflow-hidden">
                       {thumbnail ? (
@@ -274,18 +291,18 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onProjectCreate, onP
                       {/* Dropdown menu */}
                       {menuOpen === project.id && (
                         <div ref={menuRef} className="absolute top-full left-0 mt-1 z-50 min-w-[140px] rounded-lg border border-border bg-surface py-1 shadow-xl overflow-hidden">
-                          <button onClick={(e) => handleRenameClick(e, project)} className="w-full px-3 py-2 text-left flex items-center gap-2 text-sm text-text-primary hover:bg-surface-raised transition-colors">
+                          <button onClick={(e) => handleRenameClick(e, project)} className="w-full px-3 py-2 text-left flex items-center gap-2 text-sm text-text-primary hover:bg-surface-raised transition-colors cursor-pointer">
                             <Pencil className="w-3.5 h-3.5" />
                             Rename
                           </button>
-                          <button onClick={(e) => handleDeleteClick(e, project)} className="w-full px-3 py-2 text-left flex items-center gap-2 text-sm text-danger hover:bg-surface-raised transition-colors">
+                          <button onClick={(e) => handleDeleteClick(e, project)} className="w-full px-3 py-2 text-left flex items-center gap-2 text-sm text-danger hover:bg-surface-raised transition-colors cursor-pointer">
                             <Trash2 className="w-3.5 h-3.5" />
                             Delete
                           </button>
                         </div>
                       )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -334,10 +351,10 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onProjectCreate, onP
           <p className="text-xs text-text-muted">This action cannot be undone. All project data will be permanently deleted.</p>
 
           <div className="flex gap-3 justify-end pt-2">
-            <Button variant="ghost" onClick={() => setProjectToDelete(null)} disabled={isDeleting}>
+            <Button variant="secondary" className="cursor-pointer" onClick={() => setProjectToDelete(null)} disabled={isDeleting}>
               Cancel
             </Button>
-            <Button variant="default" onClick={handleConfirmDelete} disabled={isDeleting} className="bg-danger hover:bg-danger/80">
+            <Button variant="default" onClick={handleConfirmDelete} disabled={isDeleting} className="bg-danger hover:bg-danger/80 cursor-pointer">
               {isDeleting ? "Deleting..." : "Delete"}
             </Button>
           </div>

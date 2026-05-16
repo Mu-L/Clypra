@@ -463,9 +463,16 @@ const ProgramPreview: React.FC = () => {
               // Evict LRU textures if GPU memory exceeds limit
               gpuCache.evictLRU(GPU_MEMORY_LIMIT_MB);
             } else if (ctx2d) {
-              // Canvas2D fallback path: draw full-resolution bitmap scaled down to display size
+              // Canvas2D fallback path: center bitmap with aspect-ratio preservation
+              const bitmapW = result.data.width;
+              const bitmapH = result.data.height;
+              const fitScale = Math.min(displayWidth / bitmapW, displayHeight / bitmapH);
+              const drawW = bitmapW * fitScale;
+              const drawH = bitmapH * fitScale;
+              const offsetX = (displayWidth - drawW) / 2;
+              const offsetY = (displayHeight - drawH) / 2;
               ctx2d.clearRect(0, 0, displayWidth, displayHeight);
-              ctx2d.drawImage(result.data, 0, 0, displayWidth, displayHeight);
+              ctx2d.drawImage(result.data, offsetX, offsetY, drawW, drawH);
               result.data.close();
             }
           }

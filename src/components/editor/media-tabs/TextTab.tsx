@@ -15,7 +15,7 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
 
   return (
     <>
-      <div className="p-3 border-b border-border">
+      <div className="p-1 border-b border-border">
         <Button variant="secondary" size="sm" className="w-full" onClick={() => onAddToTimeline?.({ type: "custom" }, "text")}>
           <Plus className="w-4 h-4" />
           Add Custom Text

@@ -56,7 +56,7 @@ export const AudioTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
       </div>
 
       {/* Search */}
-      <div className="p-3 border-b border-border">
+      <div className="p-1 border-b border-border">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           <input type="text" placeholder={`Search ${activeSubTab === "effects" ? "sound effects" : "music"}...`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-surface-raised border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent" />

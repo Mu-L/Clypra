@@ -86,8 +86,9 @@ export class PreviewQualityManager {
     switch (tier) {
       case PreviewQualityTier.Playback: {
         // Half resolution, NO DPR — frame rate over fidelity
-        const w = Math.min(this.sequenceWidth * 0.5, this.viewportWidth);
-        const h = Math.min(this.sequenceHeight * 0.5, this.viewportHeight);
+        const scale = Math.min(0.5, this.viewportWidth / this.sequenceWidth, this.viewportHeight / this.sequenceHeight);
+        const w = this.sequenceWidth * scale;
+        const h = this.sequenceHeight * scale;
         return {
           maxWidth: Math.floor(w),
           maxHeight: Math.floor(h),
@@ -99,8 +100,9 @@ export class PreviewQualityManager {
 
       case PreviewQualityTier.Interaction: {
         // Quarter resolution, prioritizes latency
-        const w = Math.min(this.sequenceWidth * 0.25, this.viewportWidth * 0.5);
-        const h = Math.min(this.sequenceHeight * 0.25, this.viewportHeight * 0.5);
+        const scale = Math.min(0.25, (this.viewportWidth * 0.5) / this.sequenceWidth, (this.viewportHeight * 0.5) / this.sequenceHeight);
+        const w = this.sequenceWidth * scale;
+        const h = this.sequenceHeight * scale;
         return {
           maxWidth: Math.floor(w),
           maxHeight: Math.floor(h),
@@ -111,9 +113,10 @@ export class PreviewQualityManager {
       }
 
       case PreviewQualityTier.Idle: {
-        // Full resolution, capped at viewport × DPR
-        const w = Math.min(this.sequenceWidth, viewportMaxWidth);
-        const h = Math.min(this.sequenceHeight, viewportMaxHeight);
+        // Full resolution, capped at viewport × DPR, preserving aspect ratio
+        const scale = Math.min(1.0, viewportMaxWidth / this.sequenceWidth, viewportMaxHeight / this.sequenceHeight);
+        const w = this.sequenceWidth * scale;
+        const h = this.sequenceHeight * scale;
         return {
           maxWidth: Math.floor(w),
           maxHeight: Math.floor(h),
@@ -143,11 +146,7 @@ export class PreviewQualityManager {
    *   - Idle → Idle (full res, viewport-capped)
    *   - Export mode → Export (full res, no cap)
    */
-  selectTierForInteraction(
-    isPlaying: boolean,
-    isInteracting: boolean,
-    isExporting: boolean = false,
-  ): PreviewQualityTier {
+  selectTierForInteraction(isPlaying: boolean, isInteracting: boolean, isExporting: boolean = false): PreviewQualityTier {
     if (isExporting) return PreviewQualityTier.Export;
     if (isPlaying) return PreviewQualityTier.Playback;
     if (isInteracting) return PreviewQualityTier.Interaction;

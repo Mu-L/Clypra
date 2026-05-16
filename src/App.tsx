@@ -6,12 +6,14 @@ import { useProjectStore } from "@/store/projectStore";
 import { useUIStore } from "@/store/uiStore";
 import type { Project, AspectRatio } from "@/types";
 import { fromRustProject, type RustProject } from "@/types/serialization";
+import { SettingsModal } from "./components/ui/SettingsModal";
 
 const isExternalOrDataUrl = (value: string) => value.startsWith("data:") || value.startsWith("http") || value.startsWith("asset://");
 
 const App = () => {
   const { project, createProject, loadProject, setRecentProjects } = useProjectStore();
   const [isLoading, setIsLoading] = useState(true);
+  const { showSettingsModal, toggleSettingsModal } = useUIStore();
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -106,7 +108,12 @@ const App = () => {
     );
   }
 
-  return <TooltipProvider delayDuration={0}>{project ? <EditorScreen /> : <LaunchScreen onProjectCreate={handleCreateProject} onProjectOpen={handleOpenProject} />}</TooltipProvider>;
+  return (
+    <>
+      <TooltipProvider delayDuration={0}>{project ? <EditorScreen /> : <LaunchScreen onProjectCreate={handleCreateProject} onProjectOpen={handleOpenProject} />}</TooltipProvider>
+      <SettingsModal isOpen={showSettingsModal} onClose={toggleSettingsModal} />
+    </>
+  );
 };
 
 export default App;

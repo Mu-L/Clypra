@@ -100,8 +100,8 @@ export const MediaTab: React.FC<MediaTabProps> = ({ onAddToTimeline }) => {
 
   return (
     <div ref={containerRef} className={`flex-1 flex flex-col overflow-hidden transition-colors ${isDraggingOver ? "bg-surface-raised/10 transition-colors duration-300" : ""}`}>
-      <div className="p-3 border-b border-border">
-        <Button variant="secondary" size="sm" className="w-full border-dashed" onClick={importMedia} disabled={isLoading}>
+      <div className="p-1 border-b border-border">
+        <Button variant="secondary" size="sm" className="w-full border-dashed cursor-pointer" onClick={importMedia} disabled={isLoading}>
           <CloudUpload className="w-4 h-4" />
           {isLoading ? "Importing..." : "Import Media"}
         </Button>

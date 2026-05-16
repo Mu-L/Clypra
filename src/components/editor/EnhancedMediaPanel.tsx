@@ -30,7 +30,7 @@ export const EnhancedMediaPanel: React.FC<MediaTabProps> = ({ onAddToTimeline })
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${activeTab === tab.id ? "text-accent border-accent" : "text-text-muted border-transparent hover:text-text-primary"}`}>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 cursor-pointer ${activeTab === tab.id ? "text-accent border-accent" : "text-text-muted border-transparent hover:text-text-primary"}`}>
                 <Icon className="w-4 h-4" />
                 {tab.label}
               </button>

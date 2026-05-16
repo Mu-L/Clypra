@@ -83,13 +83,13 @@ export const TopBar: React.FC = () => {
             </div>
           )}
 
-          <Button variant="ghost" size="icon-sm" onClick={handleExportFrame} disabled={isExportingFrame} title="Export Current Frame (PNG)" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+          <Button variant="ghost" size="icon-sm" onClick={handleExportFrame} disabled={isExportingFrame} title="Export Current Frame (PNG)" style={{ WebkitAppRegion: "no-drag", cursor: "pointer" } as React.CSSProperties}>
             <Camera className="w-3.5 h-3.5" />
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={toggleSettingsModal} title="Settings" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+          <Button variant="ghost" size="icon-sm" onClick={toggleSettingsModal} title="Settings" style={{ WebkitAppRegion: "no-drag", cursor: "pointer" } as React.CSSProperties}>
             <Settings className="w-3.5 h-3.5" />
           </Button>
-          <Button variant="default" size="sm" onClick={() => setShowExportDialog(true)} className="text-xs h-6 px-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+          <Button variant="default" size="sm" onClick={() => setShowExportDialog(true)} className="text-xs h-6 px-2" style={{ WebkitAppRegion: "no-drag", cursor: "pointer" } as React.CSSProperties}>
             <Upload className="w-3.5 h-3.5" />
             Export
           </Button>
