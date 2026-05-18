@@ -18,9 +18,14 @@ vi.mock("../transport", () => ({
 const { FilmstripCache } = await import("../FilmstripCache");
 
 const eid = (s: string) => s as RenderEpochId;
+const emitArtifact = (handler: unknown, artifact: unknown) => {
+  if (typeof handler === "function") {
+    (handler as (a: unknown) => void)(artifact);
+  }
+};
 
 describe("FilmstripCache RAF Batching", () => {
-  let cache: FilmstripCache;
+  let cache: InstanceType<typeof FilmstripCache>;
   let rafCallbacks: Map<number, FrameRequestCallback>;
   let nextRafId: number;
 
@@ -94,9 +99,9 @@ describe("FilmstripCache RAF Batching", () => {
     });
 
     // Deliver 3 artifacts rapidly
-    capturedOnArtifact?.(makeArtifact(1000));
-    capturedOnArtifact?.(makeArtifact(2000));
-    capturedOnArtifact?.(makeArtifact(3000));
+    emitArtifact(capturedOnArtifact, makeArtifact(1000));
+    emitArtifact(capturedOnArtifact, makeArtifact(2000));
+    emitArtifact(capturedOnArtifact, makeArtifact(3000));
 
     // Should NOT have called onUpdate yet (waiting for RAF)
     expect(onUpdate).not.toHaveBeenCalled();
@@ -138,8 +143,8 @@ describe("FilmstripCache RAF Batching", () => {
     const artifact1 = makeArtifact(1000, SpatialTier.L0);
     const artifact2 = makeArtifact(1000, SpatialTier.L1);
 
-    capturedOnArtifact?.(artifact1);
-    capturedOnArtifact?.(artifact2);
+    emitArtifact(capturedOnArtifact, artifact1);
+    emitArtifact(capturedOnArtifact, artifact2);
 
     flushRaf();
 
@@ -179,7 +184,7 @@ describe("FilmstripCache RAF Batching", () => {
     });
 
     const artifact = makeArtifact(1000);
-    capturedOnArtifact?.(artifact);
+    emitArtifact(capturedOnArtifact, artifact);
 
     // Dispose before RAF flush
     cache.dispose();
@@ -220,7 +225,7 @@ describe("FilmstripCache RAF Batching", () => {
     });
 
     const artifact = makeArtifact(1000);
-    capturedOnArtifact?.(artifact);
+    emitArtifact(capturedOnArtifact, artifact);
 
     // Invalidate clip before RAF flush
     cache.invalidateClip("clip-1");
@@ -237,7 +242,7 @@ describe("FilmstripCache RAF Batching", () => {
 });
 
 describe("FilmstripCache Aggressive Cheating", () => {
-  let cache: FilmstripCache;
+  let cache: InstanceType<typeof FilmstripCache>;
   let rafCallbacks: Map<number, FrameRequestCallback>;
   let nextRafId: number;
 
@@ -311,9 +316,9 @@ describe("FilmstripCache Aggressive Cheating", () => {
     });
 
     // Deliver artifacts to populate tile cache
-    capturedOnArtifact?.(makeArtifact(0));
-    capturedOnArtifact?.(makeArtifact(5000));
-    capturedOnArtifact?.(makeArtifact(10000));
+    emitArtifact(capturedOnArtifact, makeArtifact(0));
+    emitArtifact(capturedOnArtifact, makeArtifact(5000));
+    emitArtifact(capturedOnArtifact, makeArtifact(10000));
     flushRaf();
 
     // Now set fast velocity and request again (simulating scroll)

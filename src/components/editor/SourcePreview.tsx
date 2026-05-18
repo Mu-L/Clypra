@@ -6,6 +6,7 @@ import { useTimelineStore } from "@/store/timelineStore";
 import { useProjectStore } from "@/store/projectStore";
 import { createClipFromAsset } from "@/lib/timelineClip";
 import { getActiveSessionOrNull } from "@/core/runtime/ProjectSession";
+import { autoAdaptSequenceForFirstVisualClip } from "@/lib/sequenceAutoAspect";
 import type { SourcePlaybackContext } from "@/core/playback";
 import { GPUPreview } from "./GPUPreview";
 import { AudioWaveform } from "./AudioWaveform";
@@ -18,7 +19,7 @@ const USE_GPU_PREVIEW = false;
 export const SourcePreview: React.FC = () => {
   const { sourceAsset, sourceInPoint, sourceOutPoint, exitSourceMode, markSourceIn, markSourceOut } = useUIStore();
   const { tracks, clips, addClip, addTrack } = useTimelineStore();
-  const { project } = useProjectStore();
+  const { project, updateProject } = useProjectStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -118,14 +119,22 @@ export const SourcePreview: React.FC = () => {
     }
     if (!targetTrack) return;
 
+    autoAdaptSequenceForFirstVisualClip({
+      project,
+      existingClips: clips,
+      asset: sourceAsset,
+      updateProject,
+    });
+    const nextProject = useProjectStore.getState().project;
+
     const trackClips = clips.filter((c) => c.trackId === targetTrack.id);
     const startTime = trackClips.length > 0 ? Math.max(...trackClips.map((c) => c.startTime + c.duration)) : 0;
     const newClip = createClipFromAsset({
       asset: sourceAsset,
       trackId: targetTrack.id,
       startTime,
-      width: project.canvasWidth,
-      height: project.canvasHeight,
+      width: nextProject?.canvasWidth ?? project.canvasWidth,
+      height: nextProject?.canvasHeight ?? project.canvasHeight,
     });
 
     const trimIn = sourceInPoint ?? 0;

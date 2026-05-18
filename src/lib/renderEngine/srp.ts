@@ -12,15 +12,7 @@
  *   - Quality preset filters eligible tiers (R14)
  */
 
-import {
-  SpatialTier,
-  SPATIAL_TIER_DIMS,
-  DEFAULT_SRP_CONFIG,
-  QUALITY_PRESET_TIERS,
-  QualityPreset,
-  type SrpConfig,
-  type TierBoundary,
-} from './types';
+import { SpatialTier, SPATIAL_TIER_DIMS, DEFAULT_SRP_CONFIG, QUALITY_PRESET_TIERS, QualityPreset, type SrpConfig, type TierBoundary } from "./types";
 
 // ─── SRP Result ───────────────────────────────────────────────────────────────
 
@@ -50,15 +42,9 @@ export function alignToMultipleOf4(value: number): number {
 }
 
 /** Apply DPR multiplier and align both dims to multiple of 4. */
-export function computeTextureSize(
-  baseTier: SpatialTier,
-  dprMultiplier: number,
-): readonly [number, number] {
+export function computeTextureSize(baseTier: SpatialTier, dprMultiplier: number): readonly [number, number] {
   const [baseW, baseH] = SPATIAL_TIER_DIMS[baseTier];
-  return [
-    alignToMultipleOf4(Math.round(baseW * dprMultiplier)),
-    alignToMultipleOf4(Math.round(baseH * dprMultiplier)),
-  ] as const;
+  return [alignToMultipleOf4(Math.round(baseW * dprMultiplier)), alignToMultipleOf4(Math.round(baseH * dprMultiplier))] as const;
 }
 
 // ─── Boundary Validation ──────────────────────────────────────────────────────
@@ -77,8 +63,8 @@ export function validateSrpConfig(config: SrpConfig): boolean {
   let prevMax = -Infinity;
   for (const tier of tiers) {
     const { min, max } = config[tier];
-    if (min >= max)       return false; // degenerate range
-    if (min < prevMax)    return false; // overlap
+    if (min >= max) return false; // degenerate range
+    if (min < prevMax) return false; // overlap
     prevMax = max;
   }
   return true;
@@ -95,10 +81,6 @@ let _activeConfig: SrpConfig = { ...DEFAULT_SRP_CONFIG };
  */
 export function setSrpConfig(config: SrpConfig): void {
   if (!validateSrpConfig(config)) {
-    console.warn(
-      '[SRP] Invalid tier boundary config — falling back to defaults.',
-      config,
-    );
     _activeConfig = { ...DEFAULT_SRP_CONFIG };
     return;
   }
@@ -119,11 +101,7 @@ export function getSrpConfig(): SrpConfig {
  * @param preset      Quality preset — filters which tiers are eligible (R14).
  * @returns SrpResult with spatialTier, textureSize, dprMultiplier.
  */
-export function computeSpatialTier(
-  zoomLevel: number,
-  dpr: number,
-  preset: QualityPreset = QualityPreset.Medium,
-): SrpResult {
+export function computeSpatialTier(zoomLevel: number, dpr: number, preset: QualityPreset = QualityPreset.Medium): SrpResult {
   const config = _activeConfig;
   const eligibleTiers = QUALITY_PRESET_TIERS[preset];
   const dprMultiplier = computeDprMultiplier(dpr);
@@ -143,7 +121,7 @@ export function computeSpatialTier(
   }
 
   // Clamp to eligible range if zoom is outside all configured boundaries
-  if (!sorted.some(t => config[t] && zoomLevel >= config[t].min && zoomLevel < config[t].max)) {
+  if (!sorted.some((t) => config[t] && zoomLevel >= config[t].min && zoomLevel < config[t].max)) {
     if (zoomLevel < config[sorted[sorted.length - 1]].min) {
       // Below all ranges — use lowest eligible
       selectedTier = sorted[sorted.length - 1];

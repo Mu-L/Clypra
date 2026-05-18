@@ -142,6 +142,12 @@ export async function rasterizeScene(scene: EvaluatedScene, target: RasterTarget
     throw new Error("Failed to get 2D context");
   }
 
+  // Reset transform on every frame (critical when reusing pooled canvases).
+  // Without this, ctx.scale() accumulates across frames and can push all drawing off-screen.
+  if ("setTransform" in ctx) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
   // Scale for pixel ratio
   if (pixelRatio !== 1) {
     ctx.scale(pixelRatio, pixelRatio);
@@ -176,13 +182,8 @@ export async function rasterizeScene(scene: EvaluatedScene, target: RasterTarget
 
   const rasterTimeMs = performance.now() - startTime;
 
-  // We cannot immediately release the pooled canvas back to the pool because
-  // the caller needs it to extract ImageBitmap/ImageData. The caller must
-  // either close the bitmap or we should provide a release mechanism.
-  // Wait, if it's returning the canvas, we should let the caller handle it,
-  // or wrap it so it gets returned to the pool after extraction.
-  // Actually, we can just let it be GC'd if we don't pool it. But wait, we WANT to pool it.
-  // Let's add a releaseCanvas method to RasterFrame, or use a cleanup callback.
+  // Caller must invoke releaseCanvas() after extracting ImageBitmap/ImageData
+  // to return the pooled OffscreenCanvas for reuse.
   return {
     canvas: outputCanvas,
     ctx,
@@ -239,16 +240,34 @@ async function rasterizeLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRen
  * Rasterize a media layer.
  * Uses pre-resolved resources when available.
  */
+
+/** Throttle state for video element warnings (prevent log flood at 60fps). */
+let _lastVideoWarnTime = 0;
+const VIDEO_WARN_INTERVAL_MS = 5000;
+
 async function rasterizeMediaLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, layer: EvaluatedMediaLayer, width: number, height: number, target: RasterTarget): Promise<void> {
   try {
     // 1. Try to use active video element (bypasses decoding)
     if (layer.mediaType === "video" && target.videoElements) {
       const key = `${layer.clipId}-${layer.mediaId}`;
       const video = target.videoElements.get(key);
-      if (video && video.readyState >= 2) {
-        // HAVE_CURRENT_DATA
-        ctx.drawImage(video, -width / 2, -height / 2, width, height);
+
+      if (video) {
+        if (video.readyState >= 2) {
+          // HAVE_CURRENT_DATA — element is loaded, draw it
+          ctx.drawImage(video, -width / 2, -height / 2, width, height);
+          return;
+        }
+        // Element exists but still loading — draw silent placeholder (no error)
+        drawLoadingPlaceholder(ctx, width, height);
         return;
+      } else {
+        // Only log warning occasionally to avoid spam
+        const now = performance.now();
+        if (now - _lastVideoWarnTime > VIDEO_WARN_INTERVAL_MS) {
+          _lastVideoWarnTime = now;
+          console.warn(`[Rasterizer] No video element for clip ${layer.clipId}`);
+        }
       }
     }
 
@@ -267,11 +286,18 @@ async function rasterizeMediaLayer(ctx: CanvasRenderingContext2D | OffscreenCanv
     // Fallback: load on-demand (legacy path, should be avoided)
     if (!imageBitmap) {
       if (layer.mediaType === "video") {
-        // Cannot decode video without video element
-        throw new Error(`Video frame extraction requires video element. Clip: ${layer.clipId}, Media: ${layer.mediaId}`);
+        // Cannot decode video without video element — draw placeholder silently
+        // Throttle the warning to prevent log flood at 60fps
+        const now = performance.now();
+        if (now - _lastVideoWarnTime > VIDEO_WARN_INTERVAL_MS) {
+          _lastVideoWarnTime = now;
+          console.warn(`[Rasterizer] No video element for clip ${layer.clipId} — video pool may not have synced yet`);
+        }
+        drawLoadingPlaceholder(ctx, width, height);
+        return;
       }
 
-      // Only attempt for images
+      // Only attempt fetch for images
       const response = await fetch(layer.sourcePath);
       const blob = await response.blob();
       imageBitmap = await createImageBitmap(blob);
@@ -285,7 +311,7 @@ async function rasterizeMediaLayer(ctx: CanvasRenderingContext2D | OffscreenCanv
       imageBitmap.close();
     }
   } catch (error) {
-    // Fallback: draw placeholder
+    // Fallback: draw error placeholder
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(-width / 2, -height / 2, width, height);
 
@@ -300,7 +326,7 @@ async function rasterizeMediaLayer(ctx: CanvasRenderingContext2D | OffscreenCanv
     ctx.font = "14px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("Video decode error", 0, -10);
+    ctx.fillText("Media decode error", 0, -10);
     ctx.font = "10px monospace";
     ctx.fillStyle = "#ff8888";
     ctx.fillText(layer.mediaType === "video" ? "Missing video element" : "Load failed", 0, 10);
@@ -308,6 +334,15 @@ async function rasterizeMediaLayer(ctx: CanvasRenderingContext2D | OffscreenCanv
 
     console.error(`[Rasterizer] Failed to render media layer:`, error);
   }
+}
+
+/**
+ * Draw a non-alarming loading placeholder (dark frame with spinner indicator).
+ * Used when a video element exists but hasn't loaded yet, or during pool sync.
+ */
+function drawLoadingPlaceholder(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, width: number, height: number): void {
+  ctx.fillStyle = "#0a0a0a";
+  ctx.fillRect(-width / 2, -height / 2, width, height);
 }
 
 /**

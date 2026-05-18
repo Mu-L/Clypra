@@ -9,6 +9,7 @@ import { useUIStore } from "@/store/uiStore";
 import { usePlayback } from "@/hooks/usePlayback";
 import type { VideoMetadata } from "@/types";
 import { createClipFromAsset, getTimelineViewportEnd } from "@/lib/timelineClip";
+import { autoAdaptSequenceForFirstVisualClip } from "@/lib/sequenceAutoAspect";
 import { useRenderRuntime } from "@/hooks/useRenderRuntime";
 import { getActiveSessionOrNull } from "@/core/runtime/ProjectSession";
 import { TIMELINE_MAX_PPS, TIMELINE_MIN_PPS } from "@/lib/timelineZoom";
@@ -90,7 +91,7 @@ function resolveTrackAtClientY(container: HTMLElement, tracks: Array<{ id: strin
 export const Timeline: React.FC = () => {
   const { tracks, clips, pixelsPerSecond, scrollLeft, setScrollLeft, getTimelineEndTime, addClip, addTrack, insertTrackAt, insertClipAtIndex, updateClip, normalizeTrack, removeEmptyNonMainTracks, withBatch } = useTimelineStore();
 
-  const { mediaAssets, addMediaAsset } = useProjectStore();
+  const { mediaAssets, addMediaAsset, project, updateProject } = useProjectStore();
   const { previewMode, exitSourceMode, clearSelection } = useUIStore();
   const { currentTime, duration, isPlaying, seek, setDuration } = usePlayback();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -802,12 +803,20 @@ export const Timeline: React.FC = () => {
           }
 
           if (targetTrack) {
+            autoAdaptSequenceForFirstVisualClip({
+              project,
+              existingClips: clips,
+              asset,
+              updateProject,
+            });
+            const nextProject = useProjectStore.getState().project;
+
             const newClip = createClipFromAsset({
               asset,
               trackId: targetTrack.id,
               startTime: dropTime,
-              width: useProjectStore.getState().project?.canvasWidth || 1920,
-              height: useProjectStore.getState().project?.canvasHeight || 1080,
+              width: nextProject?.canvasWidth || project?.canvasWidth || 1920,
+              height: nextProject?.canvasHeight || project?.canvasHeight || 1080,
             });
 
             addClip(newClip);
@@ -818,7 +827,7 @@ export const Timeline: React.FC = () => {
         }
       }
     },
-    [mediaAssets, addMediaAsset, tracks, getTimelineEndTime, addClip, addTrack],
+    [mediaAssets, addMediaAsset, tracks, clips, project, updateProject, getTimelineEndTime, addClip, addTrack],
   );
 
   // Listen for drag events and handle file drops

@@ -8,7 +8,7 @@
  */
 
 import { useSyncExternalStore } from "react";
-import { getActiveSessionOrNull } from "../core/runtime/ProjectSession";
+import { getActiveSessionOrNull, subscribeToSessionChanges } from "@/core/runtime/ProjectSession";
 import type { RenderEngine } from "../lib/renderEngine/renderEngine";
 
 /**
@@ -18,13 +18,7 @@ import type { RenderEngine } from "../lib/renderEngine/renderEngine";
 export function useRenderRuntime(): RenderEngine | null {
   // Subscribe to session changes
   const runtime = useSyncExternalStore(
-    (callback) => {
-      // Subscribe to session registry changes
-      // For now, we'll poll since session registry doesn't have events yet
-      // TODO: Add event emitter to session registry
-      const interval = setInterval(callback, 100);
-      return () => clearInterval(interval);
-    },
+    subscribeToSessionChanges,
     () => {
       const session = getActiveSessionOrNull();
       if (!session || session.state !== "active") {

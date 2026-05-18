@@ -67,7 +67,7 @@ export type ClipFitMode = "contain" | "cover" | "stretch" | "original";
  * - "stretch": Force to canvas dimensions (destructive, rarely used)
  * - "original": Use source dimensions 1:1 (may exceed canvas)
  *
- * Default is "contain" - the professional standard for non-destructive editing.
+ * Default is "cover" - common short-form editor behavior where media fills frame.
  */
 function calculateClipDimensions(asset: MediaAsset, canvasWidth: number, canvasHeight: number, fitMode: ClipFitMode = "contain"): { x: number; y: number; width: number; height: number } {
   const assetWidth = asset.width ?? canvasWidth;
@@ -138,8 +138,8 @@ function calculateClipDimensions(asset: MediaAsset, canvasWidth: number, canvasH
 export const createClipFromAsset = ({ asset, trackId, startTime, width, height }: CreateClipFromAssetParams): Clip => {
   const duration = resolveClipDuration(asset);
 
-  // Calculate dimensions that preserve aspect ratio (professional behavior)
-  // Default to "cover" - media fills the project frame, user adjusts transform if needed
+  // Calculate dimensions that preserve aspect ratio.
+  // Default to "cover" so first placement fills the sequence frame.
   const {
     x,
     y,
@@ -149,7 +149,7 @@ export const createClipFromAsset = ({ asset, trackId, startTime, width, height }
     asset,
     width,
     height,
-    "contain", // Professional default: fill canvas, crop overflow
+    "cover",
   );
 
   // Calculate source aspect ratio for transform constraints

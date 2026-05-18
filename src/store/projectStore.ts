@@ -131,7 +131,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     // Initialize runtime session
     try {
-      const { createProjectSession } = await import("../core/runtime/ProjectSession");
+      const { createProjectSession } = await import("@/core/runtime/ProjectSession");
       await createProjectSession(project.id);
     } catch (err) {
       console.error("[CreateProject] Runtime initialization failed:", err);
@@ -143,7 +143,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   loadProject: async (project, payload) => {
     // Dispose previous runtime first
     try {
-      const { disposeActiveSession } = await import("../core/runtime/ProjectSession");
+      const { disposeActiveSession } = await import("@/core/runtime/ProjectSession");
       await disposeActiveSession();
     } catch (err) {
       console.error("[LoadProject] Runtime disposal failed:", err);
@@ -160,14 +160,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         clips: payload?.clips ?? [],
       });
     } catch (err) {
-      console.error("[LoadProject] Failed to hydrate timeline state:", err);
       // On error, reset timeline to empty state
       import("./timelineStore").then(({ useTimelineStore }) => useTimelineStore.getState().hydrateFromProject({ tracks: [], clips: [] })).catch((resetErr) => console.error("[LoadProject] Failed to reset timeline:", resetErr));
     }
 
     // Initialize runtime LAST — stores are now fully populated
     try {
-      const { createProjectSession } = await import("../core/runtime/ProjectSession");
+      const { createProjectSession } = await import("@/core/runtime/ProjectSession");
       await createProjectSession(project.id);
     } catch (err) {
       console.error("[LoadProject] Runtime initialization failed:", err);
@@ -234,7 +233,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
       get().showToast("Project renamed");
     } catch (error) {
-      console.error("[RenameProject] Failed to rename project:", error);
       get().showToast("Failed to rename project", "error");
       throw error;
     }
@@ -256,7 +254,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         set({ project: null, mediaAssets: [] });
       }
     } catch (error) {
-      console.error("[DeleteProject] Failed to delete project:", error);
       get().showToast("Failed to delete project", "error");
       throw error;
     }
@@ -284,14 +281,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
           get().showToast("Project saved");
         } catch (error) {
-          console.error("[CloseProject] Failed to save project:", error);
           get().showToast("Failed to save before closing", "error");
         }
       }
     }
     // Dispose runtime after we've saved timeline state to avoid save-read race
     try {
-      const { disposeActiveSession } = await import("../core/runtime/ProjectSession");
+      const { disposeActiveSession } = await import("@/core/runtime/ProjectSession");
       await disposeActiveSession();
     } catch (err) {
       console.error("[CloseProject] Error disposing runtime:", err);

@@ -561,6 +561,37 @@ export class FrameScheduler {
         if (layer.mediaType === "video" && job.request.videoElements) {
           const key = `${layer.clipId}-${layer.mediaId}`;
           if (job.request.videoElements.has(key)) {
+            const video = job.request.videoElements.get(key)!;
+            
+            // If the video is currently seeking or hasn't loaded enough data yet, wait for it!
+            if (video.seeking || video.readyState < 2) {
+              const waitPromise = new Promise<void>((resolve) => {
+                let isResolved = false;
+                
+                const onReady = () => {
+                  if (isResolved) return;
+                  isResolved = true;
+                  cleanup();
+                  resolve();
+                };
+                
+                const cleanup = () => {
+                  video.removeEventListener("seeked", onReady);
+                  video.removeEventListener("canplay", onReady);
+                  video.removeEventListener("error", onReady);
+                  job.abortController.signal.removeEventListener("abort", onReady);
+                };
+                
+                video.addEventListener("seeked", onReady, { once: true });
+                video.addEventListener("canplay", onReady, { once: true });
+                video.addEventListener("error", onReady, { once: true });
+                job.abortController.signal.addEventListener("abort", onReady, { once: true });
+                
+                // Safety timeout: don't wait forever, let rasterizer handle fallback if it takes too long
+                setTimeout(onReady, 500);
+              });
+              loadPromises.push(waitPromise);
+            }
             continue; // We will draw directly from the video element
           }
         }

@@ -17,7 +17,7 @@ import { useUIStore } from "@/store/uiStore";
 import { useTimelineStore } from "@/store/timelineStore";
 import { useHistoryStore } from "@/store/historyStore";
 import { TransformClipCommand } from "@/core/history/commands/TransformCommand";
-import { calculateTransform, getCursorForHandle, getDefaultConstraints } from "@/lib/transform/calculator";
+import { calculateTransform, getDefaultConstraints } from "@/lib/transform/calculator";
 import { screenToCanvas, canvasToScreen, hitTestClip, type ViewportTransform } from "@/lib/coordinateSystem";
 import type { TransformHandle } from "@/types";
 
@@ -34,6 +34,8 @@ interface TransformOverlayProps {
   /** Display dimensions (from calculateDisplayTransform) */
   displayWidth: number;
   displayHeight: number;
+  /** Current playhead time in seconds (program context) */
+  currentTime: number;
 }
 
 /**
@@ -60,13 +62,16 @@ function mouseToCanvas(
   return screenToCanvas(localX, localY, viewport, { width: canvasWidth, height: canvasHeight }, scale, { x: 0, y: 0 });
 }
 
-export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth, canvasHeight, scale, viewport, displayOffset, displayWidth, displayHeight }) => {
-  const { selectedClipIds, activeTransform, startTransform, endTransform, selectClip } = useUIStore();
-  const { clips, updateClip } = useTimelineStore();
+export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth, canvasHeight, scale, viewport, displayOffset, displayWidth, displayHeight, currentTime }) => {
+  const { selectedClipIds, activeTransform, startTransform, endTransform, selectClip, toggleClipSelection } = useUIStore();
+  const { clips, tracks, updateClip } = useTimelineStore();
   const { execute } = useHistoryStore();
 
   const [isDragging, setIsDragging] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const clickCycleRef = useRef<{ signature: string; index: number }>({ signature: "", index: -1 });
+  const dragCursorRef = useRef<string | null>(null);
+  const suppressClickUntilRef = useRef<number>(0);
   /** Start angle (radians) for rotation drag — prevents initial snap */
   const startAngleRef = useRef<number | undefined>(undefined);
 
@@ -76,6 +81,9 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth,
   // Handle click on canvas to select clips
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
+      if (Date.now() < suppressClickUntilRef.current) {
+        return;
+      }
       // Don't handle if clicking on a handle or during drag
       if (isDragging || (e.target as HTMLElement).closest("[data-transform-handle]")) {
         return;
@@ -87,29 +95,69 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth,
       // Convert screen coordinates to canvas coordinates using overlay-local mapping
       const canvasCoords = mouseToCanvas(e.clientX, e.clientY, rect, viewport, canvasWidth, canvasHeight, scale);
 
+      const trackIndexMap = new Map(tracks.map((t, idx) => [t.id, idx]));
+      const visibleTrackIds = new Set(tracks.filter((t) => t.visible !== false).map((t) => t.id));
 
-      // Find all clips at this position (reverse order = top to bottom)
-      const clipsAtPoint = [...clips]
-        .reverse() // Top clips first
-        .filter((clip) => hitTestClip(canvasCoords.x, canvasCoords.y, clip));
+      // Selectable clips in program preview:
+      // - visible track
+      // - active at playhead
+      // - non-degenerate bounds
+      const selectable = clips
+        .map((clip, idx) => ({ clip, idx }))
+        .filter(({ clip }) => {
+          if (!visibleTrackIds.has(clip.trackId)) return false;
+          if (!(clip.width > 0 && clip.height > 0)) return false;
+          const end = clip.startTime + clip.duration;
+          return clip.startTime <= currentTime && currentTime < end;
+        });
 
-      if (clipsAtPoint.length > 0) {
-        // Select the topmost clip
-        selectClip(clipsAtPoint[0].id);
+      // Topmost-first ordering for hit-selection.
+      // Lower track index is visually higher in current compositor ordering.
+      const hitCandidates = selectable
+        .filter(({ clip }) => hitTestClip(canvasCoords.x, canvasCoords.y, clip))
+        .sort((a, b) => {
+          const ta = trackIndexMap.get(a.clip.trackId) ?? Number.MAX_SAFE_INTEGER;
+          const tb = trackIndexMap.get(b.clip.trackId) ?? Number.MAX_SAFE_INTEGER;
+          if (ta !== tb) return ta - tb;
+          // Same track: later clip in state wins by default
+          return b.idx - a.idx;
+        })
+        .map(({ clip }) => clip);
+
+      if (hitCandidates.length > 0) {
+        // Multi-select modifier: toggle topmost hit only.
+        if (e.shiftKey || e.metaKey || e.ctrlKey) {
+          toggleClipSelection(hitCandidates[0].id);
+          return;
+        }
+
+        // Single-click cycling through overlapping clips:
+        // repeated clicks at same overlap set iterate through stack.
+        const signature = hitCandidates.map((c) => c.id).join("|");
+        let nextIndex = 0;
+        if (clickCycleRef.current.signature === signature) {
+          nextIndex = (clickCycleRef.current.index + 1) % hitCandidates.length;
+        }
+        clickCycleRef.current = { signature, index: nextIndex };
+        selectClip(hitCandidates[nextIndex].id);
       } else {
         // Clicked on empty area - deselect
+        clickCycleRef.current = { signature: "", index: -1 };
         selectClip(null);
       }
     },
-    [clips, scale, viewport, canvasWidth, canvasHeight, isDragging, selectClip],
+    [clips, tracks, currentTime, scale, viewport, canvasWidth, canvasHeight, isDragging, selectClip, toggleClipSelection],
   );
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent, handle: TransformHandle) => {
       if (!selectedClip) return;
 
+      e.preventDefault();
       e.stopPropagation();
       setIsDragging(true);
+      // Prevent the synthetic click that follows drag initiation from deselecting.
+      suppressClickUntilRef.current = Date.now() + 250;
 
       const rect = overlayRef.current?.getBoundingClientRect();
       if (!rect) return;
@@ -124,6 +172,23 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth,
         startAngleRef.current = Math.atan2(canvasCoords.y - centerY, canvasCoords.x - centerX);
       } else {
         startAngleRef.current = undefined;
+      }
+
+      const dragCursor: Record<TransformHandle, string> = {
+        move: "move",
+        nw: "nw-resize",
+        ne: "ne-resize",
+        sw: "sw-resize",
+        se: "se-resize",
+        n: "n-resize",
+        s: "s-resize",
+        e: "e-resize",
+        w: "w-resize",
+        rotate: "grabbing",
+      };
+      dragCursorRef.current = dragCursor[handle] ?? null;
+      if (dragCursorRef.current) {
+        document.body.style.cursor = dragCursorRef.current;
       }
 
       startTransform({
@@ -186,6 +251,12 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth,
     if (!isDragging || !activeTransform) return;
 
     setIsDragging(false);
+    // Suppress mouseup/click tail from ending the drag and then deselecting.
+    suppressClickUntilRef.current = Date.now() + 250;
+    if (dragCursorRef.current) {
+      document.body.style.cursor = "";
+      dragCursorRef.current = null;
+    }
 
     // Read final clip state from store for history
     const finalClip = useTimelineStore.getState().clips.find((c) => c.id === activeTransform.clipId);
@@ -232,7 +303,7 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth,
     return (
       <div
         ref={overlayRef}
-        className="absolute inset-0 pointer-events-none z-50"
+        className="absolute inset-0 pointer-events-auto z-50"
         style={{
           width: displayWidth,
           height: displayHeight,
@@ -269,7 +340,7 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth,
   return (
     <div
       ref={overlayRef}
-      className="absolute inset-0 pointer-events-none z-50"
+      className="absolute inset-0 pointer-events-auto z-50"
       style={{
         width: displayWidth,
         height: displayHeight,
@@ -289,10 +360,9 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth,
         }}
       />
 
-      {/* Transform border - on top of click capture layer */}
+      {/* Transform border - visual only */}
       <div
-        className="absolute border-2 border-white pointer-events-auto cursor-move shadow-lg"
-        data-transform-handle="move"
+        className="absolute border-2 border-white pointer-events-none shadow-lg"
         style={{
           left: handleDisplayX,
           top: handleDisplayY,
@@ -303,25 +373,34 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth,
           boxShadow: "0 0 0 1px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)",
           zIndex: 10,
         }}
-        onMouseDown={(e) => {
-          handleMouseDown(e, "move");
+      />
+
+      {/* Move surface - explicit drag target across full selected bounds */}
+      <div
+        className="absolute cursor-move"
+        data-transform-handle="move"
+        style={{
+          left: handleDisplayX,
+          top: handleDisplayY,
+          width: handleDisplayWidth,
+          height: handleDisplayHeight,
+          transform: `rotate(${rotation}deg)`,
+          transformOrigin: "center",
+          background: "transparent",
+          pointerEvents: "auto",
+          zIndex: 15,
         }}
-      >
-        {/* Corner handles */}
-        <Handle position="nw" onMouseDown={(e) => handleMouseDown(e, "nw")} />
-        <Handle position="ne" onMouseDown={(e) => handleMouseDown(e, "ne")} />
-        <Handle position="sw" onMouseDown={(e) => handleMouseDown(e, "sw")} />
-        <Handle position="se" onMouseDown={(e) => handleMouseDown(e, "se")} />
+        onMouseDown={(e) => handleMouseDown(e, "move")}
+      />
 
-        {/* Edge handles */}
-        <Handle position="n" onMouseDown={(e) => handleMouseDown(e, "n")} />
-        <Handle position="s" onMouseDown={(e) => handleMouseDown(e, "s")} />
-        <Handle position="e" onMouseDown={(e) => handleMouseDown(e, "e")} />
-        <Handle position="w" onMouseDown={(e) => handleMouseDown(e, "w")} />
+      {/* Corner handles */}
+      <Handle position="nw" onMouseDown={(e) => handleMouseDown(e, "nw")} left={handleDisplayX} top={handleDisplayY} width={handleDisplayWidth} height={handleDisplayHeight} rotation={rotation} />
+      <Handle position="ne" onMouseDown={(e) => handleMouseDown(e, "ne")} left={handleDisplayX} top={handleDisplayY} width={handleDisplayWidth} height={handleDisplayHeight} rotation={rotation} />
+      <Handle position="sw" onMouseDown={(e) => handleMouseDown(e, "sw")} left={handleDisplayX} top={handleDisplayY} width={handleDisplayWidth} height={handleDisplayHeight} rotation={rotation} />
+      <Handle position="se" onMouseDown={(e) => handleMouseDown(e, "se")} left={handleDisplayX} top={handleDisplayY} width={handleDisplayWidth} height={handleDisplayHeight} rotation={rotation} />
 
-        {/* Rotation handle */}
-        <Handle position="rotate" onMouseDown={(e) => handleMouseDown(e, "rotate")} scale={scale} />
-      </div>
+      {/* Rotation handle */}
+      <Handle position="rotate" onMouseDown={(e) => handleMouseDown(e, "rotate")} scale={scale} left={handleDisplayX} top={handleDisplayY} width={handleDisplayWidth} height={handleDisplayHeight} rotation={rotation} />
     </div>
   );
 };
@@ -331,48 +410,48 @@ interface HandleProps {
   onMouseDown: (e: React.MouseEvent) => void;
   /** Current display scale — used to keep rotation handle at a constant visual distance */
   scale?: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  rotation: number;
 }
 
-const Handle: React.FC<HandleProps> = ({ position, onMouseDown, scale = 1 }) => {
+const Handle: React.FC<HandleProps> = ({ position, onMouseDown, scale = 1, left, top, width, height, rotation }) => {
   const getHandleStyle = (): React.CSSProperties => {
+    const handleSize = 14;
+    const handleRadius = handleSize / 2;
     const baseStyle: React.CSSProperties = {
       position: "absolute",
-      width: "14px",
-      height: "14px",
+      width: `${handleSize}px`,
+      height: `${handleSize}px`,
       backgroundColor: "white",
       border: "2px solid #3b82f6",
       borderRadius: "50%",
-      cursor: getCursorForHandle(position),
+      cursor: "default",
       transform: "translate(-50%, -50%)",
       boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
-      zIndex: 10,
+      zIndex: 20,
+      pointerEvents: "auto",
     };
 
     switch (position) {
       case "nw":
-        return { ...baseStyle, left: 0, top: 0 };
+        return { ...baseStyle, left: left + handleRadius, top: top + handleRadius, cursor: "nw-resize" };
       case "ne":
-        return { ...baseStyle, right: 0, top: 0, left: "auto", transform: "translate(50%, -50%)" };
+        return { ...baseStyle, left: left + width - handleRadius, top: top + handleRadius, cursor: "ne-resize" };
       case "sw":
-        return { ...baseStyle, left: 0, bottom: 0, top: "auto", transform: "translate(-50%, 50%)" };
+        return { ...baseStyle, left: left + handleRadius, top: top + height - handleRadius, cursor: "sw-resize" };
       case "se":
-        return { ...baseStyle, right: 0, bottom: 0, left: "auto", top: "auto", transform: "translate(50%, 50%)" };
-      case "n":
-        return { ...baseStyle, left: "50%", top: 0 };
-      case "s":
-        return { ...baseStyle, left: "50%", bottom: 0, top: "auto", transform: "translate(-50%, 50%)" };
-      case "e":
-        return { ...baseStyle, right: 0, top: "50%", left: "auto", transform: "translate(50%, -50%)" };
-      case "w":
-        return { ...baseStyle, left: 0, top: "50%" };
+        return { ...baseStyle, left: left + width - handleRadius, top: top + height - handleRadius, cursor: "se-resize" };
       case "rotate": {
         // Scale-compensated offset so the rotation handle stays at a constant
         // visual distance (~30px) regardless of viewport zoom.
         const offset = Math.max(20, Math.min(60, 30 / Math.max(0.1, scale)));
         return {
           ...baseStyle,
-          left: "50%",
-          top: -offset,
+          left: left + width / 2,
+          top: top - offset,
           backgroundColor: "#3b82f6",
           cursor: "grab",
           width: "16px",
@@ -384,7 +463,17 @@ const Handle: React.FC<HandleProps> = ({ position, onMouseDown, scale = 1 }) => 
     }
   };
 
-  return <div style={getHandleStyle()} onMouseDown={onMouseDown} data-transform-handle={position} />;
+  return (
+    <div
+      style={{
+        ...getHandleStyle(),
+        transform: `${getHandleStyle().transform ?? "translate(-50%, -50%)"} rotate(${rotation}deg)`,
+        transformOrigin: "center",
+      }}
+      onMouseDown={onMouseDown}
+      data-transform-handle={position}
+    />
+  );
 };
 
 // Memoize to prevent unnecessary re-renders

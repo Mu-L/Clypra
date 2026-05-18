@@ -15,7 +15,7 @@
  * If users want to see source media aspect ratio, they should use Source Preview mode.
  */
 
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Check, ChevronDown, Expand, Shrink, Volume2, VolumeX } from "lucide-react";
 import { usePlaybackClock, usePlaybackControls, useTransportControls, getPlaybackClock } from "@/hooks/usePlaybackClock";
 import { useProjectStore } from "@/store/projectStore";
@@ -23,12 +23,11 @@ import { useTimelineStore } from "@/store/timelineStore";
 import { useUIStore } from "@/store/uiStore";
 import { evaluateSceneCached } from "@/core/evaluation/evaluator";
 import { getFrameScheduler } from "@/core/scheduler/FrameScheduler";
-import { getActiveSessionOrNull } from "@/core/runtime/ProjectSession";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { getActiveSessionOrNull, subscribeToSessionChanges } from "@/core/runtime/ProjectSession";
 import { SourcePreview } from "./SourcePreview";
 import { PreviewTransport } from "./PreviewTransport";
 import { TransformOverlayMemoized as TransformOverlay } from "./transform/TransformOverlay";
-import { ViewportControls, useViewportKeyboardShortcuts, useViewportWheelZoom, useViewportPan } from "./ViewportControls";
+import { useViewportKeyboardShortcuts, useViewportWheelZoom, useViewportPan } from "./ViewportControls";
 import { calculateDisplayTransform } from "@/lib/coordinateSystem";
 import { GPUTextureCache } from "@/lib/gpuTextureCache";
 import { PreviewQualityManager, PreviewQualityTier } from "@/lib/preview/PreviewQualityManager";
@@ -123,12 +122,9 @@ const ProgramPreview: React.FC = () => {
   const { previewViewport } = useUIStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(100);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  /** Bumps after program <video> metadata loads so we re-seek once duration is valid. */
-  const [previewVideoReadyTick, setPreviewVideoReadyTick] = useState(0);
   /** fit = letterbox full canvas; fill = zoom canvas to cover panel (crop edges). */
   const [previewScaleMode, setPreviewScaleMode] = useState<"fit" | "fill">("fit");
   const [previewAspectPreset, setPreviewAspectPreset] = useState<AspectRatio>("original");
@@ -140,6 +136,7 @@ const ProgramPreview: React.FC = () => {
   const gpuCacheRef = useRef<GPUTextureCache | null>(null);
   const gpuFallbackRef = useRef(false); // true if WebGL2 unavailable → use Canvas2D
   const qualityManagerRef = useRef<PreviewQualityManager | null>(null);
+  const qualityManagerSigRef = useRef<string>("");
   const [showTelemetry, setShowTelemetry] = useState(false);
   const [telemetryStats, setTelemetryStats] = useState<{
     avgEvaluationTimeMs: number;
@@ -157,6 +154,7 @@ const ProgramPreview: React.FC = () => {
 
   const droppedFramesRef = useRef(0);
   const maxDriftRef = useRef(0);
+  const activeSession = useSyncExternalStore(subscribeToSessionChanges, getActiveSessionOrNull, () => null);
 
   // Track original canvas dimensions when project loads
   const originalCanvasDimsRef = useRef<{ width: number; height: number } | null>(null);
@@ -272,8 +270,7 @@ const ProgramPreview: React.FC = () => {
   // Scene evaluation (for UI and initial render)
   const scene = useMemo(() => evaluateSceneCached(clockState.time, clips, tracks, mediaAssets, project ?? null, epoch), [tracks, clips, mediaAssets, clockState.time, project, epoch]);
 
-  // Video element management - separate from scene time updates
-  // Create/destroy video elements based on clip composition only, not playback time
+  // Track video/audio clips for engine-side media pool sync
   const videoClips = useMemo(() => {
     return clips.filter((clip) => {
       const asset = mediaAssets.find((a) => a.id === clip.mediaId);
@@ -281,57 +278,12 @@ const ProgramPreview: React.FC = () => {
     });
   }, [clips, mediaAssets]);
 
-  // Create ref callback with proper cleanup for video elements
-  const createVideoRefCallback = useCallback((clipId: string, mediaId: string) => {
-    const key = `${clipId}-${mediaId}`;
-
-    return (el: HTMLVideoElement | null) => {
-      if (el) {
-        // Mount: register video element
-        videoRefs.current[key] = el;
-
-        // Set data attributes for sync loop
-        el.dataset.clipId = clipId;
-        el.dataset.mediaId = mediaId;
-
-        // Register with session
-        const session = getActiveSessionOrNull();
-        if (session) {
-          session.registerVideoElement(key, el);
-        }
-      } else {
-        // Unmount: cleanup immediately to prevent memory leak
-        const oldVideo = videoRefs.current[key];
-        if (oldVideo) {
-          // Unregister from session first
-          const session = getActiveSessionOrNull();
-          if (session) {
-            session.unregisterVideoElement(key);
-          }
-
-          // Release hardware decoder resources
-          // This is CRITICAL for preventing memory leaks
-          oldVideo.pause();
-          oldVideo.src = "";
-          oldVideo.load(); // Forces browser to release decoder
-
-          // Remove from local ref map
-          delete videoRefs.current[key];
-        }
-      }
-    };
-  }, []);
-
-  // Audio element management - separate from scene time updates
-  // Create/destroy audio elements for audio-only clips
   const audioClips = useMemo(() => {
     return clips.filter((clip) => {
       const asset = mediaAssets.find((a) => a.id === clip.mediaId);
       return asset?.type === "audio";
     });
   }, [clips, mediaAssets]);
-
-  const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
 
   // Calculate display dimensions for canvas with viewport transform
   const canvasWidth = project?.canvasWidth ?? 1920;
@@ -351,7 +303,8 @@ const ProgramPreview: React.FC = () => {
 
   // Preview Quality Manager — prevents 4K × DPR VRAM explosion
   const dpr = window.devicePixelRatio || 1;
-  if (!qualityManagerRef.current && project) {
+  const qmSig = `${project?.id ?? "no-project"}:${canvasWidth}x${canvasHeight}`;
+  if (project && (!qualityManagerRef.current || qualityManagerSigRef.current !== qmSig)) {
     qualityManagerRef.current = new PreviewQualityManager({
       sequenceWidth: canvasWidth,
       sequenceHeight: canvasHeight,
@@ -359,6 +312,7 @@ const ProgramPreview: React.FC = () => {
       viewportHeight: Math.floor(displayHeight),
       dpr,
     });
+    qualityManagerSigRef.current = qmSig;
   }
   if (qualityManagerRef.current) {
     qualityManagerRef.current.updateViewport(Math.floor(displayWidth), Math.floor(displayHeight), dpr);
@@ -460,7 +414,7 @@ const ProgramPreview: React.FC = () => {
       if (gpuCache) {
         const renderW = profile.maxWidth;
         const renderH = profile.maxHeight;
-        const cacheKey = `preview:${epoch}:${timeToRender.toFixed(3)}:${renderW}x${renderH}:${dpr}`;
+        const cacheKey = `preview:${project.id}:${epoch}:${timeToRender.toFixed(3)}:${renderW}x${renderH}:${dpr}`;
         if (gpuCache.hasTexture(cacheKey)) {
           gpuCache.clear();
           // Render full-resolution texture scaled down to display size
@@ -476,12 +430,8 @@ const ProgramPreview: React.FC = () => {
       }
 
       // Build map of active video elements to bypass resource decoding
-      const activeVideoElements = new Map<string, HTMLVideoElement>();
-      for (const [key, video] of Object.entries(videoRefs.current)) {
-        if (video) {
-          activeVideoElements.set(key, video);
-        }
-      }
+      const session = getActiveSessionOrNull();
+      const activeVideoElements = session?.getPreviewVideoElements() ?? new Map<string, HTMLVideoElement>();
 
       // Schedule frame render at quality-manager-capped resolution
       // Prevents 4K × DPR VRAM explosion while maintaining visual fidelity
@@ -507,7 +457,7 @@ const ProgramPreview: React.FC = () => {
           if (result.data instanceof ImageBitmap) {
             if (gpuCache) {
               // GPU path: upload capped-resolution bitmap as texture, render scaled down to display size
-              const cacheKey = `preview:${epoch}:${timeToRender.toFixed(3)}:${profile.maxWidth}x${profile.maxHeight}:${dpr}`;
+              const cacheKey = `preview:${project.id}:${epoch}:${timeToRender.toFixed(3)}:${profile.maxWidth}x${profile.maxHeight}:${dpr}`;
               gpuCache.uploadTexture(cacheKey, result.data, result.data.width, result.data.height);
               gpuCache.clear();
               // Scale down from full canvas resolution to display size
@@ -573,305 +523,27 @@ const ProgramPreview: React.FC = () => {
     };
   }, [useCanvasPreview, clips, tracks, mediaAssets, project, epoch, clock, displayWidth, displayHeight, canvasWidth, canvasHeight]);
 
-  // Cleanup video elements on component unmount only
-  useEffect(() => {
-    return () => {
-      const session = getActiveSessionOrNull();
-      Object.entries(videoRefs.current).forEach(([key, video]) => {
-        if (!video) return;
-        session?.unregisterVideoElement(key);
-        video.pause();
-        video.src = "";
-        video.load();
+  // ── Sync preview media elements with engine pool ─────────────────────────
+  // The engine (PreviewMediaPool) owns all <video> and <audio> elements.
+  // React only tells it what should exist and what the current clock state is.
+  // We use useLayoutEffect so it syncs BEFORE the RAF render loop fires its first frame.
+  useLayoutEffect(() => {
+    const session = activeSession;
+
+    if (!session) return;
+
+    try {
+      session.syncPreviewMedia(clips, mediaAssets, tracks, {
+        time: clock.time,
+        state: clockState.state,
+        speed: clockState.speed,
+        muted: isMuted,
+        volume,
       });
-      videoRefs.current = {};
-    };
-  }, []);
-
-  // Cleanup audio elements on component unmount only
-  useEffect(() => {
-    return () => {
-      Object.entries(audioRefs.current).forEach(([key, audio]) => {
-        if (!audio) return;
-        audio.pause();
-        audio.src = "";
-        audio.load();
-      });
-      audioRefs.current = {};
-    };
-  }, []);
-
-  // Sync video playback state (doesn't touch src)
-  useEffect(() => {
-    const currentClockTime = clock.time;
-
-    Object.values(videoRefs.current).forEach((video) => {
-      if (!video) return;
-
-      const clipId = video.dataset.clipId;
-      const mediaId = video.dataset.mediaId;
-      const videoKey = `${clipId}-${mediaId}`;
-
-      // Skip if video has no source or isn't ready
-      if (!video.src || video.readyState < 2) {
-        return;
-      }
-
-      // Audio settings
-      video.muted = isMuted || volume === 0;
-      video.volume = Math.max(0, Math.min(1, volume / 100));
-      video.playbackRate = clockState.speed;
-
-      // Set initial time when starting playback or when paused
-      if (Number.isFinite(video.duration) && video.duration > 0) {
-        const clip = clips.find((c) => c.id === clipId);
-
-        if (clip) {
-          const clipLocalTime = currentClockTime - clip.startTime;
-          const trimIn = clip.trimIn || 0;
-          const sourceTime = trimIn + clipLocalTime;
-          const targetTime = Math.max(0, Math.min(sourceTime, Math.max(0, video.duration - 0.01)));
-
-          if (clockState.state !== "playing") {
-            video.currentTime = targetTime;
-          } else if (video.paused) {
-            video.currentTime = targetTime;
-          }
-        }
-      }
-
-      // Play/pause based on clock state
-      if (clockState.state === "playing") {
-        if (video.paused) {
-          // Only try to play if video is ready
-          if (video.readyState >= 3) {
-            const playPromise = video.play();
-            if (playPromise !== undefined) {
-              playPromise
-                .then(() => {})
-                .catch((err) => {
-                  if (err.name !== "AbortError") {
-                    console.warn(`[PreviewPanel] Video ${videoKey} - play() failed:`, err);
-                  }
-                });
-            }
-          }
-        }
-      } else {
-        if (!video.paused) {
-          video.pause();
-        }
-      }
-    });
-
-    // NO cleanup here - videos persist across playback state changes
-  }, [clockState.state, isMuted, volume, clockState.speed, clips, clock, previewVideoReadyTick]);
-
-  // Continuous drift correction via RAF (replaces 250ms interval for frame-accurate sync)
-  useEffect(() => {
-    if (clockState.state !== "playing") return;
-
-    let rafId: number | null = null;
-
-    const syncLoop = () => {
-      const currentClockTime = clock.time; // Fresh time every frame
-
-      Object.values(videoRefs.current).forEach((video) => {
-        if (!video) return;
-
-        const clipId = video.dataset.clipId;
-        const clip = clips.find((c) => c.id === clipId);
-        if (!clip) return;
-
-        const clipLocalTime = currentClockTime - clip.startTime;
-        if (clipLocalTime < 0 || clipLocalTime > clip.duration) {
-          if (!video.paused) video.pause();
-          return;
-        }
-
-        const trimIn = clip.trimIn || 0;
-        const sourceTime = trimIn + clipLocalTime;
-
-        if (Number.isFinite(video.duration) && video.duration > 0 && video.readyState >= 3) {
-          const targetTime = Math.max(0, Math.min(sourceTime, Math.max(0, video.duration - 0.01)));
-          const drift = Math.abs(video.currentTime - targetTime);
-
-          maxDriftRef.current = Math.max(maxDriftRef.current, drift);
-
-          if ("preservesPitch" in video) {
-            (video as any).preservesPitch = false;
-          }
-
-          if (drift < 0.1) {
-            // <100ms: Perfect sync — just ensure correct playbackRate
-            if (Math.abs(video.playbackRate - clockState.speed) > 0.01) {
-              video.playbackRate = clockState.speed;
-            }
-          } else if (drift <= 0.3) {
-            // 100ms - 300ms: Soft playbackRate correction
-            const correctionSpeed = video.currentTime < targetTime ? clockState.speed * 1.02 : clockState.speed * 0.98;
-            if (Math.abs(video.playbackRate - correctionSpeed) > 0.01) {
-              video.playbackRate = correctionSpeed;
-            }
-          } else if (drift <= 0.6) {
-            // 300ms - 600ms: Hard seek
-            video.currentTime = targetTime;
-            video.playbackRate = clockState.speed;
-          } else {
-            // >600ms: Playback recovery reset
-            video.pause();
-            video.currentTime = targetTime;
-            video.playbackRate = clockState.speed;
-            const p = video.play();
-            if (p && typeof p.catch === "function") p.catch(console.error);
-          }
-        }
-      });
-
-      rafId = requestAnimationFrame(syncLoop);
-    };
-
-    rafId = requestAnimationFrame(syncLoop);
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
-  }, [clockState.state, clockState.speed, clips, clock]);
-
-  // ── Audio Element Sync (Play/Pause/Seek) ──────────────────────────────────
-  // Sync audio playback state with master clock
-  useEffect(() => {
-    const currentClockTime = clock.time;
-
-    Object.values(audioRefs.current).forEach((audio) => {
-      if (!audio) return;
-
-      const clipId = audio.dataset.clipId;
-      const mediaId = audio.dataset.mediaId;
-      const audioKey = `${clipId}-${mediaId}`;
-
-      // Skip if audio has no source or isn't ready
-      if (!audio.src || audio.readyState < 2) {
-        return;
-      }
-
-      // Audio settings
-      audio.muted = isMuted || volume === 0;
-      audio.volume = Math.max(0, Math.min(1, volume / 100));
-      audio.playbackRate = clockState.speed;
-
-      // Set initial time when starting playback or when paused
-      if (Number.isFinite(audio.duration) && audio.duration > 0) {
-        const clip = clips.find((c) => c.id === clipId);
-
-        if (clip) {
-          const clipLocalTime = currentClockTime - clip.startTime;
-          const trimIn = clip.trimIn || 0;
-          const sourceTime = trimIn + clipLocalTime;
-          const targetTime = Math.max(0, Math.min(sourceTime, Math.max(0, audio.duration - 0.01)));
-
-          if (clockState.state !== "playing") {
-            audio.currentTime = targetTime;
-          } else if (audio.paused) {
-            audio.currentTime = targetTime;
-          }
-        }
-      }
-
-      // Play/pause based on clock state
-      if (clockState.state === "playing") {
-        if (audio.paused) {
-          // Only try to play if audio is ready
-          if (audio.readyState >= 3) {
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-              playPromise
-                .then(() => {})
-                .catch((err) => {
-                  if (err.name !== "AbortError") {
-                    console.warn(`[PreviewPanel] Audio ${audioKey} - play() failed:`, err);
-                  }
-                });
-            }
-          }
-        }
-      } else {
-        if (!audio.paused) {
-          audio.pause();
-        }
-      }
-    });
-
-    // NO cleanup here - audio elements persist across playback state changes
-  }, [clockState.state, isMuted, volume, clockState.speed, clips, clock]);
-
-  // ── Audio Drift Correction ────────────────────────────────────────────────
-  // Continuous drift correction via RAF for frame-accurate audio sync
-  useEffect(() => {
-    if (clockState.state !== "playing") return;
-
-    let rafId: number | null = null;
-
-    const syncLoop = () => {
-      const currentClockTime = clock.time; // Fresh time every frame
-
-      Object.values(audioRefs.current).forEach((audio) => {
-        if (!audio) return;
-
-        const clipId = audio.dataset.clipId;
-        const clip = clips.find((c) => c.id === clipId);
-        if (!clip) return;
-
-        const clipLocalTime = currentClockTime - clip.startTime;
-        if (clipLocalTime < 0 || clipLocalTime > clip.duration) {
-          if (!audio.paused) audio.pause();
-          return;
-        }
-
-        const trimIn = clip.trimIn || 0;
-        const sourceTime = trimIn + clipLocalTime;
-
-        if (Number.isFinite(audio.duration) && audio.duration > 0 && audio.readyState >= 3) {
-          const targetTime = Math.max(0, Math.min(sourceTime, Math.max(0, audio.duration - 0.01)));
-          const drift = Math.abs(audio.currentTime - targetTime);
-
-          if ("preservesPitch" in audio) {
-            (audio as any).preservesPitch = false;
-          }
-
-          if (drift < 0.1) {
-            // <100ms: Perfect sync — just ensure correct playbackRate
-            if (Math.abs(audio.playbackRate - clockState.speed) > 0.01) {
-              audio.playbackRate = clockState.speed;
-            }
-          } else if (drift <= 0.3) {
-            // 100ms - 300ms: Soft playbackRate correction
-            const correctionSpeed = audio.currentTime < targetTime ? clockState.speed * 1.02 : clockState.speed * 0.98;
-            if (Math.abs(audio.playbackRate - correctionSpeed) > 0.01) {
-              audio.playbackRate = correctionSpeed;
-            }
-          } else if (drift <= 0.6) {
-            // 300ms - 600ms: Hard seek
-            audio.currentTime = targetTime;
-            audio.playbackRate = clockState.speed;
-          } else {
-            // >600ms: Playback recovery reset
-            audio.pause();
-            audio.currentTime = targetTime;
-            audio.playbackRate = clockState.speed;
-            const p = audio.play();
-            if (p && typeof p.catch === "function") p.catch(console.error);
-          }
-        }
-      });
-
-      rafId = requestAnimationFrame(syncLoop);
-    };
-
-    rafId = requestAnimationFrame(syncLoop);
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
-  }, [clockState.state, clockState.speed, clips, clock]);
+    } catch (error) {
+      console.error(`[PreviewPanel ERROR] Exception calling syncPreviewMedia:`, error);
+    }
+  }, [activeSession, clips, mediaAssets, tracks, clockState.state, clockState.speed, isMuted, volume, clock.time, clockState.time]);
 
   if (!project) return null;
 
@@ -937,210 +609,26 @@ const ProgramPreview: React.FC = () => {
         <div className="absolute inset-0 checkerboard opacity-[0.15] pointer-events-none" />
         <div ref={containerRef} className={cn("w-full h-full flex items-center justify-center relative z-10 overflow-hidden", isPanning && "cursor-grabbing", spacePressed && !isPanning && "cursor-grab")}>
           <div data-testid="program-preview-viewport" className="relative flex shrink-0 items-center justify-center overflow-hidden shadow-[0_0_40px_rgba(0, 0, 0, 0.36)]" style={{ width: displayWidth, height: displayHeight }}>
-            {useCanvasPreview ? (
-              <>
-                {/* Canvas-based preview (matches export rendering) */}
-                <canvas
-                  ref={canvasRef}
-                  data-testid="program-preview-canvas"
-                  /* Backing-store size is set dynamically in the render-loop effect
-                     to displayWidth*dpr × displayHeight*dpr for crisp HiDPI rendering.
-                     CSS size controls layout. */
-                  style={{
-                    width: displayWidth,
-                    height: displayHeight,
-                    imageRendering: "auto",
-                  }}
-                  className="bg-black"
-                />
+            <>
+              {/* Canvas-based preview (matches export rendering) */}
+              <canvas
+                ref={canvasRef}
+                data-testid="program-preview-canvas"
+                /* Backing-store size is set dynamically in the render-loop effect
+                   to displayWidth*dpr × displayHeight*dpr for crisp HiDPI rendering.
+                   CSS size controls layout. */
+                style={{
+                  width: displayWidth,
+                  height: displayHeight,
+                  imageRendering: "auto",
+                }}
+                className="bg-black"
+              />
 
-                {/* Transform overlay for selected clips */}
-                <TransformOverlay canvasWidth={canvasWidth} canvasHeight={canvasHeight} scale={scale} viewport={previewViewport} displayOffset={{ x: offsetX, y: offsetY }} displayWidth={displayWidth} displayHeight={displayHeight} />
+              {/* Transform overlay for selected clips */}
+              <TransformOverlay canvasWidth={canvasWidth} canvasHeight={canvasHeight} scale={scale} viewport={previewViewport} displayOffset={{ x: offsetX, y: offsetY }} displayWidth={displayWidth} displayHeight={displayHeight} currentTime={currentTime} />
 
-                {/* Viewport controls */}
-                <ViewportControls canvasWidth={canvasWidth} canvasHeight={canvasHeight} containerWidth={dimensions.width} containerHeight={dimensions.height} />
-
-                {/* Hidden video elements for audio/video sync (ENGINE CLOCK IS MASTER). 
-                    CRITICAL: Do NOT use width: 0, height: 0, or opacity: 0. 
-                    Browsers throttle decoding for invisible videos, destroying A/V sync.
-                    Keep them 1x1 pixel with near-zero opacity to force hardware decoding. 
-                    
-                    ARCHITECTURE: Video elements are keyed by clip+media ID and persist across time updates.
-                    They are only created/destroyed when clips are added/removed, not on every frame. */}
-                <div className="absolute top-0 left-0 pointer-events-none -z-10" style={{ width: "16px", height: "16px", opacity: 0.01, visibility: "hidden", overflow: "hidden" }}>
-                  {videoClips.map((clip) => {
-                    const asset = mediaAssets.find((a) => a.id === clip.mediaId);
-                    if (!asset) return null;
-                    const sourcePath = asset.path.startsWith("asset://") ? asset.path : convertFileSrc(asset.path);
-
-                    return (
-                      <video
-                        key={`${clip.id}-${clip.mediaId}`}
-                        data-media-id={clip.mediaId}
-                        data-clip-id={clip.id}
-                        ref={createVideoRefCallback(clip.id, clip.mediaId)}
-                        src={sourcePath}
-                        muted={isMuted || volume === 0}
-                        playsInline
-                        preload="auto"
-                        onLoadedMetadata={(e) => {
-                          const video = e.currentTarget;
-                          const key = `${clip.id}-${clip.mediaId}`;
-                          setPreviewVideoReadyTick((n) => n + 1);
-                        }}
-                        onCanPlay={(e) => {
-                          const video = e.currentTarget;
-                          const key = `${clip.id}-${clip.mediaId}`;
-                        }}
-                        onError={(e) => {
-                          const key = `${clip.id}-${clip.mediaId}`;
-                          console.error(`[PreviewPanel] Video error - ${key}:`, e.currentTarget.error);
-                        }}
-                        className="w-full h-full"
-                      />
-                    );
-                  })}
-                </div>
-
-                {/* Hidden audio elements for audio-only clips (ENGINE CLOCK IS MASTER).
-                    ARCHITECTURE: Audio elements are keyed by clip+media ID and persist across time updates.
-                    They are only created/destroyed when clips are added/removed, not on every frame. */}
-                <div className="absolute top-0 left-0 pointer-events-none -z-10" style={{ width: "1px", height: "1px", opacity: 0, visibility: "hidden", overflow: "hidden" }}>
-                  {audioClips.map((clip) => {
-                    const asset = mediaAssets.find((a) => a.id === clip.mediaId);
-                    if (!asset) return null;
-                    const sourcePath = asset.path.startsWith("asset://") ? asset.path : convertFileSrc(asset.path);
-
-                    return (
-                      <audio
-                        key={`${clip.id}-${clip.mediaId}`}
-                        data-media-id={clip.mediaId}
-                        data-clip-id={clip.id}
-                        ref={(el) => {
-                          const key = `${clip.id}-${clip.mediaId}`;
-                          if (el) {
-                            audioRefs.current[key] = el;
-                          } else if (audioRefs.current[key]) {
-                            delete audioRefs.current[key];
-                          }
-                        }}
-                        src={sourcePath}
-                        preload="auto"
-                        onLoadedMetadata={(e) => {
-                          const audio = e.currentTarget;
-                          const key = `${clip.id}-${clip.mediaId}`;
-                        }}
-                        onCanPlay={(e) => {
-                          const audio = e.currentTarget;
-                          const key = `${clip.id}-${clip.mediaId}`;
-                        }}
-                        onError={(e) => {
-                          const key = `${clip.id}-${clip.mediaId}`;
-                          console.error(`[PreviewPanel] Audio error - ${key}:`, e.currentTarget.error);
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              // DOM-based preview (legacy, for comparison)
-              <div data-testid="program-preview-canvas" className="relative shrink-0 bg-black" style={{ width: displayWidth, height: displayHeight }}>
-                {scene.visualLayers.length === 0 ? (
-                  <div className="absolute inset-0 flex items-center justify-center text-text-muted">Preview</div>
-                ) : (
-                  scene.visualLayers.map((layer) => {
-                    // Render text layers
-                    if (layer.layerType === "text") {
-                      return (
-                        <div
-                          key={layer.layerId}
-                          data-testid="preview-text-layer"
-                          className="absolute overflow-hidden flex items-center justify-center"
-                          style={{
-                            left: layer.x * scale,
-                            top: layer.y * scale,
-                            width: layer.width * scale,
-                            height: layer.height * scale,
-                            opacity: Math.max(0, Math.min(1, layer.opacity > 1 ? layer.opacity / 100 : layer.opacity)),
-                            transform: `rotate(${layer.rotation}deg)`,
-                            transformOrigin: "center center",
-                            zIndex: layer.zIndex + 1,
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontFamily: layer.fontFamily,
-                              fontSize: `${layer.fontSize * scale}px`,
-                              color: layer.color,
-                              fontWeight: layer.fontWeight,
-                              fontStyle: layer.fontStyle,
-                              textAlign: layer.textAlign,
-                              lineHeight: layer.lineHeight,
-                              letterSpacing: `${layer.letterSpacing * scale}px`,
-                              whiteSpace: "pre-wrap",
-                              wordBreak: "break-word",
-                              width: "100%",
-                              padding: "8px",
-                            }}
-                          >
-                            {layer.text}
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    // Render media layers (video/image)
-                    return (
-                      <div
-                        key={layer.layerId}
-                        data-testid="preview-layer"
-                        className="absolute overflow-hidden"
-                        style={{
-                          left: layer.x * scale,
-                          top: layer.y * scale,
-                          width: layer.width * scale,
-                          height: layer.height * scale,
-                          opacity: Math.max(0, Math.min(1, layer.opacity > 1 ? layer.opacity / 100 : layer.opacity)),
-                          transform: `rotate(${layer.rotation}deg)`,
-                          transformOrigin: "center center",
-                          zIndex: layer.zIndex + 1,
-                        }}
-                      >
-                        {layer.mediaType === "video" ? (
-                          <video
-                            data-media-id={layer.mediaId}
-                            data-clip-id={layer.clipId}
-                            ref={(el) => {
-                              videoRefs.current[`${layer.clipId}-${layer.mediaId}`] = el;
-                              if (el) {
-                              }
-                            }}
-                            src={layer.sourcePath}
-                            muted={isMuted || volume === 0}
-                            playsInline
-                            preload="auto"
-                            onLoadedMetadata={(e) => {
-                              const video = e.currentTarget;
-                              setPreviewVideoReadyTick((n) => n + 1);
-                            }}
-                            onCanPlay={(e) => {
-                              const video = e.currentTarget;
-                            }}
-                            onError={(e) => {
-                              console.error(`[PreviewPanel] Video error (visual) - ${layer.clipId}-${layer.mediaId}:`, e.currentTarget.error);
-                            }}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <img src={layer.posterFrame || layer.sourcePath} alt={layer.mediaId} className="w-full h-full object-cover" />
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
+            </>
           </div>
         </div>
 

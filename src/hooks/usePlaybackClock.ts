@@ -22,7 +22,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { getPlaybackClock, type PlaybackClockState } from "../core/playback";
 import type { TransportAuthority, PlaybackContextStateSnapshot } from "../core/playback";
-import { getActiveSessionOrNull } from "../core/runtime/ProjectSession";
+import { getActiveSessionOrNull } from "@/core/runtime/ProjectSession";
 
 /**
  * Hook for UI snapshots of playback state.

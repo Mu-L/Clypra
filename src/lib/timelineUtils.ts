@@ -10,6 +10,7 @@ import { AddTrackCommand, AddClipCommand, DeleteClipCommand } from "../core/hist
 import { capitalize } from "./utils";
 import { DensityLevel as DensityLevelEnum } from "../types";
 import { createClipFromAsset } from "./timelineClip";
+import { autoAdaptSequenceForFirstVisualClip } from "./sequenceAutoAspect";
 import { generateId } from "@/lib/id";
 
 // Density configurations mapping zoom levels to extraction densities. Each configuration defines the time interval between thumbnails and the zoom range.
@@ -99,9 +100,17 @@ export function handleCreateTrackAndDrop(item: DragItem, monitor: any, insertInd
   execute(new AddTrackCommand(newTrack, insertIndex));
 
   if (item.type === "MEDIA_ASSET") {
-    const { project } = useProjectStore.getState();
-    const canvasWidth = project?.canvasWidth ?? 1920;
-    const canvasHeight = project?.canvasHeight ?? 1080;
+    const projectState = useProjectStore.getState();
+    autoAdaptSequenceForFirstVisualClip({
+      project: projectState.project,
+      existingClips: useTimelineStore.getState().clips,
+      asset: item.asset,
+      updateProject: projectState.updateProject,
+    });
+
+    const nextProject = useProjectStore.getState().project;
+    const canvasWidth = nextProject?.canvasWidth ?? projectState.project?.canvasWidth ?? 1920;
+    const canvasHeight = nextProject?.canvasHeight ?? projectState.project?.canvasHeight ?? 1080;
 
     // Use createClipFromAsset to preserve aspect ratio (professional behavior)
     const newClip = createClipFromAsset({
@@ -132,9 +141,17 @@ export function handleDropOnTrack(item: DragItem, monitor: any, trackId: string)
   const startTime = offset && containerRect ? Math.max(0, (offset.x - containerRect.left + scrollLeft) / pixelsPerSecond) : 0;
 
   if (item.type === "MEDIA_ASSET") {
-    const { project } = useProjectStore.getState();
-    const canvasWidth = project?.canvasWidth ?? 1920;
-    const canvasHeight = project?.canvasHeight ?? 1080;
+    const projectState = useProjectStore.getState();
+    autoAdaptSequenceForFirstVisualClip({
+      project: projectState.project,
+      existingClips: useTimelineStore.getState().clips,
+      asset: item.asset,
+      updateProject: projectState.updateProject,
+    });
+
+    const nextProject = useProjectStore.getState().project;
+    const canvasWidth = nextProject?.canvasWidth ?? projectState.project?.canvasWidth ?? 1920;
+    const canvasHeight = nextProject?.canvasHeight ?? projectState.project?.canvasHeight ?? 1080;
 
     // Use createClipFromAsset to preserve aspect ratio (professional behavior)
     const newClip = createClipFromAsset({

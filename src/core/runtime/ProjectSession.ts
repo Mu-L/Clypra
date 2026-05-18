@@ -52,6 +52,8 @@ import { SourcePlaybackContext } from "../playback/SourcePlaybackContext";
 import { getFrameScheduler, FrameScheduler } from "../scheduler/FrameScheduler";
 import { RenderEngine } from "@/lib/renderEngine/renderEngine";
 import { QualityPreset, RendererMode, type SrpConfig } from "@/lib/renderEngine/types";
+import { PreviewMediaPool, type PreviewSyncState } from "../resources/PreviewMediaPool";
+import type { Clip, MediaAsset } from "@/types";
 
 /**
  * Project Session State
@@ -63,6 +65,7 @@ export type SessionState = "initializing" | "active" | "disposing" | "disposed";
  */
 export type SessionEventType = "initialized" | "disposed" | "error";
 export type SessionEventListener = (event: { type: SessionEventType; session: ProjectSession; error?: Error }) => void;
+type SessionRegistryListener = (session: ProjectSession | null) => void;
 
 export class ProjectSession {
   // Session identity
@@ -84,7 +87,7 @@ export class ProjectSession {
   private _listeners = new Set<SessionEventListener>();
 
   // Resource tracking (for leak detection)
-  private _videoElements = new Map<string, HTMLVideoElement>();
+  private _previewMediaPool: PreviewMediaPool | null = null;
   private _asyncTasks = new Set<AbortController>();
   private _rafIds = new Set<number>();
 
@@ -177,6 +180,9 @@ export class ProjectSession {
         rendererMode: RendererMode.Canvas2D,
       });
 
+      // Create preview media pool (headless video/audio elements)
+      this._previewMediaPool = new PreviewMediaPool();
+
       // Initialize stores (timeline, UI)
       await this._initializeStores();
 
@@ -264,17 +270,45 @@ export class ProjectSession {
   // ─── Resource Management ────────────────────────────────────────────────
 
   /**
-   * Register video element for lifecycle management.
+   * Synchronize preview media elements with timeline state.
+   * Creates/destroys headless video/audio elements as needed.
    */
-  registerVideoElement(id: string, video: HTMLVideoElement): void {
-    this._videoElements.set(id, video);
+  syncPreviewMedia(clips: Clip[], assets: MediaAsset[], tracks: Array<{ id: string; type: string }>, syncState: PreviewSyncState): void {
+    if (!this._previewMediaPool) {
+      console.error(`[ProjectSession] PreviewMediaPool is null!`);
+      return;
+    }
+    this._previewMediaPool.sync(clips, assets, tracks, syncState);
   }
 
   /**
-   * Unregister video element.
+   * Get active video elements for scheduler rasterization bypass.
    */
-  unregisterVideoElement(id: string): void {
-    this._videoElements.delete(id);
+  getPreviewVideoElements(): Map<string, HTMLVideoElement> {
+    return this._previewMediaPool?.getVideoElements() ?? new Map();
+  }
+
+  /**
+   * Get active audio elements.
+   */
+  getPreviewAudioElements(): Map<string, HTMLAudioElement> {
+    return this._previewMediaPool?.getAudioElements() ?? new Map();
+  }
+
+  /**
+   * @deprecated Video elements are now managed by PreviewMediaPool.
+   * Kept for backward compatibility during transition.
+   */
+  registerVideoElement(_id: string, _video: HTMLVideoElement): void {
+    // No-op — elements are managed by PreviewMediaPool
+  }
+
+  /**
+   * @deprecated Video elements are now managed by PreviewMediaPool.
+   * Kept for backward compatibility during transition.
+   */
+  unregisterVideoElement(_id: string): void {
+    // No-op — elements are managed by PreviewMediaPool
   }
 
   /**
@@ -316,6 +350,11 @@ export class ProjectSession {
       selectedClipIds: [],
       selectedTrackId: null,
       previewMode: "program",
+      previewViewport: {
+        zoom: 1.0,
+        panX: 0,
+        panY: 0,
+      },
     });
   }
 
@@ -333,17 +372,11 @@ export class ProjectSession {
   }
 
   private async _releaseMediaResources(): Promise<void> {
-    // Pause and release all video elements
-    for (const [id, video] of this._videoElements) {
-      try {
-        video.pause();
-        video.src = "";
-        video.load(); // Release decoder resources
-      } catch (error) {
-        console.warn(`[ProjectSession] Failed to release video ${id}:`, error);
-      }
+    // Dispose preview media pool (releases all video/audio elements)
+    if (this._previewMediaPool) {
+      this._previewMediaPool.dispose();
+      this._previewMediaPool = null;
     }
-    this._videoElements.clear();
   }
 
   private _cancelRAFLoops(): void {
@@ -395,7 +428,7 @@ export class ProjectSession {
       state: this._state,
       playbackState: this._playback?.state ?? null,
       pendingJobs: this._scheduler?.getStats().active ?? 0,
-      videoElements: this._videoElements.size,
+      videoElements: this._previewMediaPool ? this._previewMediaPool.getVideoElements().size : 0,
       asyncTasks: this._asyncTasks.size,
       rafLoops: this._rafIds.size,
     };
@@ -408,6 +441,7 @@ export class ProjectSession {
  */
 class SessionRegistry {
   private _activeSession: ProjectSession | null = null;
+  private _listeners = new Set<SessionRegistryListener>();
 
   /**
    * Get active session (if any).
@@ -425,6 +459,7 @@ class SessionRegistry {
       await this._activeSession.dispose();
     }
     this._activeSession = session;
+    this._notifyListeners();
   }
 
   /**
@@ -432,6 +467,21 @@ class SessionRegistry {
    */
   async clearActiveSession(): Promise<void> {
     await this.setActiveSession(null);
+  }
+
+  subscribe(listener: SessionRegistryListener): () => void {
+    this._listeners.add(listener);
+    return () => this._listeners.delete(listener);
+  }
+
+  private _notifyListeners(): void {
+    this._listeners.forEach((listener) => {
+      try {
+        listener(this._activeSession);
+      } catch (error) {
+        console.error(`[ProjectSession] Session registry listener error:`, error);
+      }
+    });
   }
 }
 
@@ -456,6 +506,14 @@ export function getActiveSession(): ProjectSession {
  */
 export function getActiveSessionOrNull(): ProjectSession | null {
   return sessionRegistry.getActiveSession();
+}
+
+/**
+ * Subscribe to active session changes.
+ * Useful for React components that need to react when session becomes available.
+ */
+export function subscribeToSessionChanges(listener: () => void): () => void {
+  return sessionRegistry.subscribe(() => listener());
 }
 
 /**

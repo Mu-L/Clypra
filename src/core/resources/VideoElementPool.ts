@@ -78,10 +78,6 @@ export class VideoElementPool {
 
       this.elements.set(sourceUrl, video);
       this.activeCount++;
-
-      if (this.config.debug) {
-        console.log(`[VideoElementPool] Created video element for ${sourceUrl}`);
-      }
     }
 
     // Seek to target time
@@ -137,10 +133,6 @@ export class VideoElementPool {
       video.load(); // Release decoder resources
       this.elements.delete(sourceUrl);
       this.activeCount--;
-
-      if (this.config.debug) {
-        console.log(`[VideoElementPool] Released video element for ${sourceUrl}`);
-      }
     }
   }
 
@@ -150,10 +142,6 @@ export class VideoElementPool {
   clear(): void {
     for (const [url] of this.elements) {
       this.release(url);
-    }
-
-    if (this.config.debug) {
-      console.log(`[VideoElementPool] Cleared all video elements`);
     }
   }
 

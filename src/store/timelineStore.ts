@@ -234,7 +234,7 @@ export const useTimelineStore = create<TimelineStore>(
         // If timeline was empty, switch to program preview and seek to zero
         if (wasEmpty) {
           // Import dynamically to avoid circular dependency
-          import("../core/runtime/ProjectSession").then(({ getActiveSessionOrNull }) => {
+          import("@/core/runtime/ProjectSession").then(({ getActiveSessionOrNull }) => {
             const session = getActiveSessionOrNull();
             if (session?.transportAuthority) {
               session.transportAuthority.setActiveContext("program");
@@ -250,6 +250,7 @@ export const useTimelineStore = create<TimelineStore>(
 
         return {
           clips: [...state.clips, clip],
+          epoch: state.epoch + 1,
         };
       });
     },
@@ -261,7 +262,7 @@ export const useTimelineStore = create<TimelineStore>(
         // If removing the last clip, reset playhead to 00:00
         if (remainingClips.length === 0) {
           // Import dynamically to avoid circular dependency
-          import("../core/runtime/ProjectSession").then(({ getActiveSessionOrNull }) => {
+          import("@/core/runtime/ProjectSession").then(({ getActiveSessionOrNull }) => {
             const session = getActiveSessionOrNull();
             if (session?.transportAuthority) {
               session.transportAuthority.seek(0);

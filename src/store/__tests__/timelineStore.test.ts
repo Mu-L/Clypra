@@ -378,7 +378,7 @@ describe("timelineStore clip operations", () => {
     });
   });
 
-  describe("beginBatch / endBatch", () => {
+  describe("withBatch", () => {
     beforeEach(() => {
       const { addClip } = useTimelineStore.getState();
       addClip({ id: "c1", trackId: "t1", mediaId: "m1", startTime: 0, duration: 2, trimIn: 0, trimOut: 2, x: 0, y: 0, width: 100, height: 100, opacity: 1, rotation: 0 });

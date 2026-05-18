@@ -8,10 +8,11 @@ import { useTimelineStore } from "@/store/timelineStore";
 import { useProjectStore } from "@/store/projectStore";
 import { createClipFromAsset } from "@/lib/timelineClip";
 import { createTextClip, TEXT_PRESETS } from "@/lib/textClip";
+import { autoAdaptSequenceForFirstVisualClip } from "@/lib/sequenceAutoAspect";
 
 export const EditorLayout: React.FC = () => {
-  const { tracks, addClip, addTrack, getTimelineEndTime } = useTimelineStore();
-  const { mediaAssets, project } = useProjectStore();
+  const { tracks, clips, addClip, addTrack, getTimelineEndTime } = useTimelineStore();
+  const { mediaAssets, project, updateProject } = useProjectStore();
 
   const handleAddToTimeline = (item: any, type: string) => {
     // Handle different item types
@@ -37,12 +38,21 @@ export const EditorLayout: React.FC = () => {
       // Get the end time of all existing clips
       const endTime = getTimelineEndTime();
 
+      autoAdaptSequenceForFirstVisualClip({
+        project,
+        existingClips: clips,
+        asset: mediaAsset,
+        updateProject,
+      });
+
+      const nextProject = useProjectStore.getState().project;
+
       const newClip = createClipFromAsset({
         asset: mediaAsset,
         trackId: targetTrack.id,
         startTime: endTime,
-        width: project?.canvasWidth || 1920,
-        height: project?.canvasHeight || 1080,
+        width: nextProject?.canvasWidth || project?.canvasWidth || 1920,
+        height: nextProject?.canvasHeight || project?.canvasHeight || 1080,
       });
 
       addClip(newClip);
