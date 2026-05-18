@@ -163,6 +163,8 @@ export interface TransformConstraints {
   aspectRatioLocked: boolean;
   minWidth: number;
   minHeight: number;
+  maxWidth?: number;
+  maxHeight?: number;
   canvasWidth: number;
   canvasHeight: number;
   snapToGrid?: boolean;

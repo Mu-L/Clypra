@@ -28,6 +28,12 @@
 import { create } from "zustand";
 import type { MediaAsset, TransformState } from "@/types";
 
+const SELECT_TRACE = import.meta.env.DEV;
+const traceSelect = (...args: unknown[]) => {
+  if (!SELECT_TRACE) return;
+  console.log("[SelectTrace][UIStore]", ...args);
+};
+
 interface UIStore {
   selectedClipIds: string[]; // Multi-select support
   selectedTrackId: string | null;
@@ -114,12 +120,14 @@ export const useUIStore = create<UIStore>((set, get) => ({
   },
 
   selectClip: (clipId) => {
+    traceSelect("selectClip", { clipId, prev: get().selectedClipIds });
     set({ selectedClipIds: clipId ? [clipId] : [] });
   },
 
   toggleClipSelection: (clipId) => {
     set((state) => {
       const already = state.selectedClipIds.includes(clipId);
+      traceSelect("toggleClipSelection", { clipId, already, prev: state.selectedClipIds });
       return {
         selectedClipIds: already ? state.selectedClipIds.filter((id) => id !== clipId) : [...state.selectedClipIds, clipId],
       };
@@ -127,6 +135,7 @@ export const useUIStore = create<UIStore>((set, get) => ({
   },
 
   clearSelection: () => {
+    traceSelect("clearSelection", { prev: get().selectedClipIds });
     set({ selectedClipIds: [] });
   },
 
@@ -194,6 +203,7 @@ export const useUIStore = create<UIStore>((set, get) => ({
 
   // Transform tool actions
   startTransform: (state) => {
+    traceSelect("startTransform", { clipId: state.clipId, handle: state.handle, selected: get().selectedClipIds });
     set({ activeTransform: state, transformMode: "transform" });
   },
 
@@ -202,6 +212,7 @@ export const useUIStore = create<UIStore>((set, get) => ({
   },
 
   endTransform: () => {
+    traceSelect("endTransform", { activeTransform: get().activeTransform, selected: get().selectedClipIds });
     set({ activeTransform: null, transformMode: "select" });
   },
 

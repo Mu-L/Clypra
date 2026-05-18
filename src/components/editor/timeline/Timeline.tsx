@@ -22,6 +22,12 @@ import { Track } from "./Track";
 import { Playhead } from "./Playhead";
 import { EmptyTimelineDropZone } from "./EmptyTimelineDropZone";
 
+const SELECT_TRACE = import.meta.env.DEV;
+const traceSelect = (...args: unknown[]) => {
+  if (!SELECT_TRACE) return;
+  console.log("[SelectTrace][Timeline]", ...args);
+};
+
 /** Multiplier on normalized wheel delta (pixels); higher = stronger zoom per tick. */
 const WHEEL_ZOOM_SENSITIVITY = 0.006;
 /** Extra multiplier for Ctrl/⌘ + wheel zoom feel (higher = faster). */
@@ -547,7 +553,16 @@ export const Timeline: React.FC = () => {
       if (event.button !== 0) return;
       const target = event.target as HTMLElement | null;
       if (!target) return;
+      const timelineRoot = containerRef.current;
+      // Only clear selection for clicks that happen inside the timeline region.
+      // Do not clear when interacting with Program Preview / transform overlay.
+      if (!timelineRoot || !timelineRoot.contains(target)) return;
       if (target.closest('[data-timeline-interactive="true"]')) return;
+      traceSelect("window pointerdown -> clearSelection", {
+        target: target.tagName,
+        className: target.className,
+        selectedBefore: useUIStore.getState().selectedClipIds,
+      });
       useUIStore.getState().clearSelection();
     };
 

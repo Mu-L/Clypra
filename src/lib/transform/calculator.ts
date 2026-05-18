@@ -12,7 +12,8 @@
 
 import type { Clip, TransformHandle, TransformConstraints } from "@/types";
 
-const MIN_CLIP_SIZE = 20; // Minimum width/height in pixels
+const MIN_CLIP_SIZE = 24; // Minimum practical transform target
+const MAX_CLIP_SCALE_FROM_CANVAS = 8; // Professional guardrail against runaway scaling
 
 /**
  * Calculate new transform from handle drag operation.
@@ -97,9 +98,9 @@ function handleCornerDrag(clip: Clip, handle: "nw" | "ne" | "sw" | "se", delta: 
   let newWidth = clip.width + delta.x * scaleX;
   let newHeight = clip.height + delta.y * scaleY;
 
-  // Enforce minimum size
-  newWidth = Math.max(constraints.minWidth, newWidth);
-  newHeight = Math.max(constraints.minHeight, newHeight);
+  const clamped = clampDimensions(newWidth, newHeight, clip, constraints, isLocked);
+  newWidth = clamped.width;
+  newHeight = clamped.height;
 
   if (isLocked) {
     // Maintain aspect ratio - use the dimension that changed more
@@ -190,12 +191,37 @@ function handleEdgeDrag(clip: Clip, handle: "n" | "s" | "e" | "w", delta: { x: n
       break;
   }
 
+  const clamped = clampDimensions(newWidth, newHeight, clip, constraints, isLocked);
+  newWidth = clamped.width;
+  newHeight = clamped.height;
+
   return {
     x: newX,
     y: newY,
     width: newWidth,
     height: newHeight,
   };
+}
+
+function clampDimensions(width: number, height: number, clip: Clip, constraints: TransformConstraints, keepAspect: boolean): { width: number; height: number } {
+  const defaultMaxWidth = Math.max(constraints.canvasWidth * MAX_CLIP_SCALE_FROM_CANVAS, constraints.minWidth);
+  const defaultMaxHeight = Math.max(constraints.canvasHeight * MAX_CLIP_SCALE_FROM_CANVAS, constraints.minHeight);
+  const maxWidth = constraints.maxWidth ?? defaultMaxWidth;
+  const maxHeight = constraints.maxHeight ?? defaultMaxHeight;
+
+  let w = Math.max(constraints.minWidth, Math.min(maxWidth, width));
+  let h = Math.max(constraints.minHeight, Math.min(maxHeight, height));
+
+  if (keepAspect) {
+    const aspect = clip.sourceAspectRatio ?? clip.width / Math.max(1, clip.height);
+    const scaleFromWidth = w / Math.max(1, clip.width);
+    const scaleFromHeight = h / Math.max(1, clip.height);
+    const scale = Math.min(scaleFromWidth, scaleFromHeight);
+    w = Math.max(constraints.minWidth, Math.min(maxWidth, clip.width * scale));
+    h = Math.max(constraints.minHeight, Math.min(maxHeight, clip.height * scale));
+  }
+
+  return { width: w, height: h };
 }
 
 /**
@@ -326,6 +352,8 @@ export function getDefaultConstraints(canvasWidth: number, canvasHeight: number,
     aspectRatioLocked,
     minWidth: MIN_CLIP_SIZE,
     minHeight: MIN_CLIP_SIZE,
+    maxWidth: canvasWidth * MAX_CLIP_SCALE_FROM_CANVAS,
+    maxHeight: canvasHeight * MAX_CLIP_SCALE_FROM_CANVAS,
     canvasWidth,
     canvasHeight,
     snapToGrid: false,
