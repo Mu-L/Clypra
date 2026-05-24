@@ -126,6 +126,7 @@ export function evaluateScene(time: number, clips: Clip[], tracks: Track[], asse
         stroke: textClip.stroke,
         shadow: textClip.shadow,
         background: textClip.background,
+        styleId: textClip.styleId,
       };
 
       visualLayers.push(textLayer);

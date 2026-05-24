@@ -7,6 +7,7 @@ import type { TabProps } from "./types";
 import { EffectCard } from "@/components/ui/EffectCard";
 import { TemplateCard } from "@/components/ui/TemplateCard";
 import { useUIStore } from "@/store/uiStore";
+import { TextEffectPicker } from "../../../features/text-effects/TextEffectPicker";
 
 export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
   const [activeTab, setActiveTab] = useState<"effects" | "templates" | "yours" | "captions">("effects");
@@ -19,6 +20,26 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
 
   const handlePreview = (item: any, type: "effect" | "template") => {
     useUIStore.getState().previewTextPreset(item, type);
+  };
+
+  const handlePremiumPreview = (effect: any) => {
+    useUIStore.getState().previewTextPreset({
+      id: effect.id,
+      name: effect.name,
+      presetType: "effect",
+      fontFamily: effect.font.family,
+      color: effect.fills[0]?.type === "solid" ? (effect.fills[0] as any).color : "#ffffff",
+      fontWeight: effect.font.weight === 900 ? "bold" : "normal",
+      fontStyle: effect.font.style,
+      stroke: effect.strokes[0] ? { color: effect.strokes[0].color, width: strokeWidthToStandard(effect.strokes[0].width) } : undefined,
+      shadow: effect.shadows[0] ? { color: effect.shadows[0].color, blur: effect.shadows[0].blur, offsetX: effect.shadows[0].offsetX, offsetY: effect.shadows[0].offsetY } : undefined,
+      background: effect.background ? { color: effect.background.color, padding: effect.background.paddingX, borderRadius: effect.background.borderRadius } : undefined,
+      styleId: effect.id,
+    }, "effect");
+  };
+
+  const strokeWidthToStandard = (width: number) => {
+    return width;
   };
 
   useEffect(() => {
@@ -154,13 +175,13 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
       </div>
 
       {/* ── Sub-Categories Horizontal Navigation Row (Overflows X) ─────── */}
-      {(activeTab === "effects" || activeTab === "templates") && (
+      {activeTab === "templates" && (
         <div className="relative shrink-0 border-b border-border/40 bg-surface/5">
           {/* Subtle Left Fade indicator */}
           <div className="absolute left-0 top-0 bottom-0 w-3 bg-linear-to-l to-surface from-transparent pointer-events-none" />
 
           <div className="flex overflow-x-auto gap-2 p-1 whitespace-nowrap" style={{ scrollbarWidth: "none" }}>
-            {(activeTab === "effects" ? effectCategories : templateCategories).map((cat) => (
+            {templateCategories.map((cat) => (
               <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-2 py-1 text-xs font-medium rounded-sm transition-colors cursor-pointer ${activeCategory === cat ? "bg-accent/10 text-accent" : "text-text-muted hover:text-text-primary"}`}>
                 {cat}
               </button>
@@ -173,16 +194,18 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
       )}
 
       {/* ── Search bar header ────────────────────────────────────────── */}
-      <div className="p-1 border-b border-border/30 flex items-center justify-between gap-3 shrink-0">
-        <div className="flex-1 relative">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input type="text" placeholder={`Search ${activeTab === "effects" ? "effects" : activeTab === "templates" ? "templates" : "text presets"}...`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-surface-raised rounded-sm pl-8 pr-3 py-1.5 text-xs text-text-primary outline-none transition-colors" />
-        </div>
+      {activeTab !== "effects" && (
+        <div className="p-1 border-b border-border/30 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex-1 relative">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+            <input type="text" placeholder={`Search ${activeTab === "templates" ? "templates" : "text presets"}...`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-surface-raised rounded-sm pl-8 pr-3 py-1.5 text-xs text-text-primary outline-none transition-colors" />
+          </div>
 
-        <div className="flex items-center gap-1 shrink-0 text-[10px] font-mono text-text-muted font-semibold bg-surface-raised border border-border/50 px-2 py-1.5 rounded-md">
-          <span className="text-accent-soft">{activeCategory}</span>
+          <div className="flex items-center gap-1 shrink-0 text-[10px] font-mono text-text-muted font-semibold bg-surface-raised border border-border/50 px-2 py-1.5 rounded-md">
+            <span className="text-accent-soft">{activeCategory}</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Main content Scrollable Grid area ───────────────────────── */}
       <div className="grow overflow-y-auto scrollbar-thin p-3.5">
@@ -221,20 +244,10 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
 
         {/* Effects Display Grid */}
         {activeTab === "effects" && (
-          <>
-            {filteredEffects.length === 0 ? (
-              <div className="h-40 flex flex-col items-center justify-center text-text-muted gap-1 text-xs">
-                <p>No matching effects found</p>
-                <p className="opacity-60">Try searching for other styles</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-3">
-                {filteredEffects.map((effect) => (
-                  <EffectCard key={effect.id} effect={effect} isFavorite={favorites.includes(effect.id)} isDownloading={downloadingIds.has(effect.id)} onFavorite={(e) => toggleFavorite(effect.id, e)} onApply={(e) => handleDownloadAndApply(effect, "effect", e)} onPreview={() => handlePreview(effect, "effect")} />
-                ))}
-              </div>
-            )}
-          </>
+          <TextEffectPicker
+            selectedEffectId={useUIStore((state) => state.sourceTextPreset?.styleId)}
+            onEffectSelect={handlePremiumPreview}
+          />
         )}
 
         {/* Templates Display Grid */}

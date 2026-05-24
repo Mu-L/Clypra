@@ -168,6 +168,9 @@ export interface EvaluatedTextLayer extends BaseVisualLayer {
     padding: number;
     borderRadius: number;
   };
+
+  /** Style preset ID for text effects */
+  readonly styleId?: string;
 }
 
 /**

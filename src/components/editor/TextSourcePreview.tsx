@@ -1,4 +1,6 @@
-import React from "react";
+import { useRef, useEffect } from "react";
+import { allEffects } from "../../features/text-effects/effects/definitions";
+import { renderTextEffect } from "../../features/text-effects/renderer";
 
 const getFontFamilyStack = (fontFamily: string) => {
   const f = fontFamily.toLowerCase();
@@ -10,7 +12,27 @@ const getFontFamilyStack = (fontFamily: string) => {
 };
 
 export const TextSourcePreview: React.FC<{ preset: any }> = ({ preset }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewText = preset.name || "Text";
+  const premiumEffect = preset.styleId ? allEffects.find((e) => e.id === preset.styleId) : null;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !premiumEffect) return;
+    canvas.width = 640;
+    canvas.height = 360;
+    renderTextEffect(canvas, previewText, premiumEffect, 44);
+  }, [previewText, premiumEffect]);
+
   if (!preset) return null;
+
+  if (premiumEffect) {
+    return (
+      <div className="w-full aspect-video bg-black flex items-center justify-center relative p-8 shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-white/5 overflow-hidden">
+        <canvas ref={canvasRef} className="max-w-full max-h-full block select-none pointer-events-none" />
+      </div>
+    );
+  }
 
   // Build dynamic CSS styles
   const baseStyle: React.CSSProperties = {
@@ -62,8 +84,6 @@ export const TextSourcePreview: React.FC<{ preset: any }> = ({ preset }) => {
         borderRadius: `${preset.background.borderRadius * 1.2}px`,
       }
     : {};
-
-  const previewText = preset.name || "Text";
 
   return (
     <div className="w-full aspect-video bg-black flex items-center justify-center relative p-8 shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-white/5 overflow-hidden">
