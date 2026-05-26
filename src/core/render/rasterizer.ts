@@ -17,8 +17,8 @@
 
 import type { EvaluatedScene, EvaluatedMediaLayer, EvaluatedTextLayer } from "../evaluation/types";
 import { getResourceCache } from "../resources/ResourceCache";
-import { renderTextEffectToContext } from "../../features/renderer/renderer";
-import { allEffects } from "../../features/renderer/definitions";
+import { renderTextEffectToContext } from "../../features/text-effects/renderer";
+import { allTextEffects } from "../../features/text-effects/registry";
 
 /**
  * Global pool for OffscreenCanvas to prevent GC stalls during rendering/export.
@@ -356,21 +356,28 @@ function drawLoadingPlaceholder(ctx: CanvasRenderingContext2D | OffscreenCanvasR
 function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, layer: EvaluatedTextLayer, width: number, height: number, scaleX: number, scaleY: number): void {
   // If we have a styleId matching our core text effects, use core procedural renderer
   if (layer.styleId) {
-    const effect = allEffects.find((e) => e.id === layer.styleId);
+    const effect = allTextEffects.find((e) => e.id === layer.styleId);
     if (effect) {
+      const overriddenEffect = {
+        ...effect,
+        font: {
+          ...effect.font,
+          family: layer.fontFamily || effect.font.family,
+        },
+      };
       const fontSize = layer.fontSize * scaleY;
-      const totalHeight = (layer.text.split("\n").length) * fontSize * effect.font.lineHeight;
+      const totalHeight = layer.text.split("\n").length * fontSize * overriddenEffect.font.lineHeight;
       let startY: number;
       switch (layer.verticalAlign) {
         case "top":
-          startY = -height / 2 + (fontSize * effect.font.lineHeight) / 2;
+          startY = -height / 2 + (fontSize * overriddenEffect.font.lineHeight) / 2;
           break;
         case "bottom":
-          startY = height / 2 - totalHeight + (fontSize * effect.font.lineHeight) / 2;
+          startY = height / 2 - totalHeight + (fontSize * overriddenEffect.font.lineHeight) / 2;
           break;
         case "middle":
         default:
-          startY = -totalHeight / 2 + (fontSize * effect.font.lineHeight) / 2;
+          startY = -totalHeight / 2 + (fontSize * overriddenEffect.font.lineHeight) / 2;
           break;
       }
       let textX: number;
@@ -391,16 +398,7 @@ function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRende
       ctx.rect(-width / 2, -height / 2, width, height);
       ctx.clip();
 
-      renderTextEffectToContext(
-        ctx,
-        layer.text,
-        effect,
-        fontSize,
-        textX,
-        startY + totalHeight / 2 - (fontSize * effect.font.lineHeight) / 2,
-        width,
-        height
-      );
+      renderTextEffectToContext(ctx, layer.text, overriddenEffect, fontSize, textX, startY + totalHeight / 2 - (fontSize * overriddenEffect.font.lineHeight) / 2, width, height);
       ctx.restore();
       return;
     }

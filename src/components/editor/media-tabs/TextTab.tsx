@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Search, Sparkles, MessageSquare } from "lucide-react";
+
 import { Button } from "@/components/ui/Button";
-import { TEXT_EFFECTS } from "@/constants/textEffects";
 import { ALL_TEMPLATES } from "@/features/text-templates/templates/index";
 import { TemplateDefinition, TemplateCustomization } from "@/features/text-templates/types";
 import type { TabProps } from "./types";
@@ -10,6 +10,7 @@ import { TemplateCard } from "@/components/ui/TemplateCard";
 import { TemplatePreview } from "@/features/text-templates/TemplatePreview";
 import { getActiveSessionOrNull } from "@/core/runtime/ProjectSession";
 import { useUIStore } from "@/store/uiStore";
+import { allTextEffects } from "@/features/text-effects/registry";
 
 // Categories list - mapped to EffectCategory type
 const effectCategories = ["Classic", "Metallic", "Neon", "Gradient", "3D", "Retro", "Grunge", "Clean", "Glitch", "Organic", "Space"];
@@ -36,7 +37,7 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
           presetType: "template",
           injectedData: item.lottieData,
         },
-        "template",
+        type,
       );
 
       // Set active transport context to source immediately
@@ -110,13 +111,12 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
             name: item.name,
             presetType: "effect",
             styleId: item.id,
-            fontFamily: item.fontFamily,
-            color: item.color,
-            fontWeight: item.fontWeight,
-            fontStyle: item.fontStyle,
-            stroke: item.stroke,
-            shadow: item.shadow,
-            background: item.background,
+            fontFamily: item.font?.family,
+            color: item.fills?.[0]?.color,
+            fontWeight: item.font?.weight,
+            fontStyle: item.font?.style,
+            stroke: item.strokes?.[0] ? { color: item.strokes[0].color, width: item.strokes[0].width } : undefined,
+            shadow: item.shadows?.[0] ? { color: item.shadows[0].color, blur: item.shadows[0].blur, offsetX: item.shadows[0].offsetX ?? 0, offsetY: item.shadows[0].offsetY ?? 0 } : undefined,
           },
           "text",
         );
@@ -169,11 +169,11 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
   }
 
   // Filter items - compare lowercase category names
-  const filteredEffects = TEXT_EFFECTS.filter((effect) => effect.category.toLowerCase() === activeCategory.toLowerCase() && effect.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredEffects = allTextEffects.filter((effect) => effect.category.toLowerCase() === activeCategory.toLowerCase() && effect.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const filteredTemplates = ALL_TEMPLATES.filter((template) => (activeCategory === "All" || template.category.toLowerCase().replace("-", " ") === activeCategory.toLowerCase()) && template.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const favoriteEffectsList = TEXT_EFFECTS.filter((e) => favorites.includes(e.id));
+  const favoriteEffectsList = allTextEffects.filter((e) => favorites.includes(e.id));
   const favoriteTemplatesList = ALL_TEMPLATES.filter((t) => favorites.includes(t.id));
 
   return (

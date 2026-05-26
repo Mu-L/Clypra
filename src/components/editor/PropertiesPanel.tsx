@@ -7,9 +7,12 @@ import { useProjectStore } from "@/store/projectStore";
 import { useHistoryStore } from "@/store/historyStore";
 import { TransformClipCommand } from "@/core/history/commands/TransformCommand";
 import { calculateClipDimensions, type ClipFitModeExtended } from "@/lib/timelineClip";
-import { TEXT_EFFECTS, type TextEffectPreset } from "@/constants/textEffects";
+import { allTextEffects } from "@/features/text-effects/registry";
+import type { TextEffectDefinition } from "@/features/text-effects/types/types";
 import type { TextClip } from "@/types";
 import { normalizeFontFamily } from "@/core/evaluation/evaluator";
+
+import { _buildConfig } from "@/features/text-effects/registry";
 
 export const PropertiesPanel: React.FC = () => {
   const { selectedClipIds } = useUIStore();
@@ -79,18 +82,30 @@ export const PropertiesPanel: React.FC = () => {
   };
 
   // Quick switch text effects
-  const applyEffectPreset = (effect: TextEffectPreset) => {
+  const applyEffectPreset = (effect: TextEffectDefinition) => {
     handleUpdateMultiple({
       styleId: effect.id,
-      fontFamily: effect.fontFamily,
-      color: effect.color,
-      fontWeight: effect.fontWeight,
-      fontStyle: effect.fontStyle,
-      stroke: effect.stroke,
-      shadow: effect.shadow,
-      background: effect.background,
+      fontFamily: effect.font.family,
+      color: effect.fills?.[0]?.color,
+      fontWeight: effect.font.weight,
+      fontStyle: effect.font.style,
+      stroke: effect.strokes?.[0] ? { color: effect.strokes[0].color, width: effect.strokes[0].width } : undefined,
+      shadow: effect.shadows?.[0] ? { color: effect.shadows[0].color, blur: effect.shadows[0].blur, offsetX: effect.shadows[0].offsetX ?? 0, offsetY: effect.shadows[0].offsetY ?? 0 } : undefined,
     });
   };
+
+  // Get the selected effect's definition from allTextEffects
+  const effectDefinition = allTextEffects.find((e) => e.id === textClip.styleId);
+
+  if (effectDefinition) {
+    // Resolve the definition into the exact flat config the engine constructor expects!
+    const effectDefaults = _buildConfig(effectDefinition, textClip.text, textClip.fontSize, textClip.width || 640, textClip.height || 360);
+
+    // Now you have the strict defaults defined by the studio! E.g.:
+    console.log("Strict Default Fill Color:", effectDefaults.fillColor);
+    console.log("Strict Default Bevel Depth:", effectDefaults.bevelDepth);
+    console.log("Strict Default Scanline Toggle:", effectDefaults.isGlitchEffect);
+  }
 
   return (
     <div className="w-92 min-h-0 panel-shell flex flex-col overflow-hidden shrink-0">
@@ -139,12 +154,41 @@ export const PropertiesPanel: React.FC = () => {
                 <div>
                   <label className="text-[10px] text-text-muted block mb-1 select-none">Font Family</label>
                   <select value={normalizeFontFamily(textClip.fontFamily || "Inter Variable")} onChange={(e) => handleUpdate("fontFamily", e.target.value)} className="w-full bg-surface-raised border border-border rounded px-2.5 py-1.5 text-xs text-text-primary outline-none">
-                    <option value="Inter Variable">Inter</option>
-                    <option value="Montserrat Variable">Montserrat</option>
-                    <option value="Geist Variable">Geist</option>
-                    <option value="Outfit Variable">Outfit</option>
-                    <option value="Roboto Variable">Roboto</option>
-                    <option value="Space Grotesk Variable">Space Grotesk</option>
+                    <optgroup label="System Fonts">
+                      <option value="Arial">Arial</option>
+                      <option value="Arial Black">Arial Black</option>
+                      <option value="Arial Rounded MT Bold">Arial Rounded MT Bold</option>
+                      <option value="Georgia">Georgia</option>
+                      <option value="Times New Roman">Times New Roman</option>
+                      <option value="Courier New">Courier New</option>
+                      <option value="Impact">Impact</option>
+                      <option value="Verdana">Verdana</option>
+                      <option value="Trebuchet MS">Trebuchet MS</option>
+                      <option value="Palatino">Palatino</option>
+                    </optgroup>
+                    <optgroup label="Google Web Fonts">
+                      <option value="Inter Variable">Inter</option>
+                      <option value="Geist Variable">Geist</option>
+                      <option value="Outfit Variable">Outfit</option>
+                      <option value="Space Grotesk Variable">Space Grotesk</option>
+                      <option value="Roboto Variable">Roboto</option>
+                      <option value="Roboto Condensed">Roboto Condensed</option>
+                      <option value="Open Sans">Open Sans</option>
+                      <option value="Lato">Lato</option>
+                      <option value="Montserrat Variable">Montserrat</option>
+                      <option value="Raleway">Raleway</option>
+                      <option value="Oswald">Oswald</option>
+                      <option value="Playfair Display">Playfair Display</option>
+                      <option value="Anton">Anton</option>
+                      <option value="Bebas Neue">Bebas Neue</option>
+                      <option value="Nunito">Nunito</option>
+                      <option value="Poppins">Poppins</option>
+                      <option value="Permanent Marker">Permanent Marker</option>
+                      <option value="Bangers">Bangers</option>
+                      <option value="Press Start 2P">Press Start 2P</option>
+                      <option value="Dancing Script">Dancing Script</option>
+                      <option value="Pacifico">Pacifico</option>
+                    </optgroup>
                   </select>
                 </div>
 
@@ -379,15 +423,15 @@ export const PropertiesPanel: React.FC = () => {
             <div>
               <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-2 select-none">Quick Presets Switch</label>
               <div className="grid grid-cols-3 gap-2 bg-surface-raised/10 border border-border/40 p-2.5 rounded-xl">
-                {TEXT_EFFECTS.slice(0, 6).map((effect) => (
+                {allTextEffects.slice(0, 6).map((effect) => (
                   <button
                     key={effect.id}
                     onClick={() => applyEffectPreset(effect)}
                     className="p-2 rounded bg-surface-raised border border-border hover:border-accent text-center truncate text-[10px] text-text-primary font-bold shadow-[0_2px_4px_rgba(0,0,0,0.15)] transition-all cursor-pointer max-w-[90px]"
                     style={{
-                      fontFamily: effect.fontFamily,
-                      color: effect.color.includes(",") ? effect.color.split(",")[0] : effect.color,
-                      textShadow: effect.shadow ? `0 0 4px ${effect.shadow.color}` : "none",
+                      fontFamily: effect.font.family,
+                      color: effect.fills?.[0]?.color ?? "#ffffff",
+                      textShadow: effect.shadows?.[0] ? `0 0 4px ${effect.shadows[0].color}` : effect.glows?.[0] ? `0 0 4px ${effect.glows[0].color}` : "none",
                     }}
                   >
                     {effect.name}

@@ -1,11 +1,10 @@
 import { useState, useCallback, useEffect } from "react";
 import { Download, Star } from "lucide-react";
-import { type TextEffectPreset } from "@/constants/textEffects";
-import { renderTextEffect } from "@/features/renderer/renderer";
-import { allEffects } from "@/features/renderer/definitions";
+import { renderTextEffect } from "@/features/text-effects/renderer";
+import type { TextEffectDefinition } from "@/features/text-effects/types/types";
 
 interface EffectCardProps {
-  effect: TextEffectPreset;
+  effect: TextEffectDefinition;
   isFavorite: boolean;
   isDownloading: boolean;
   onFavorite: (e: React.MouseEvent) => void;
@@ -14,25 +13,24 @@ interface EffectCardProps {
 }
 
 export const EffectCard: React.FC<EffectCardProps> = ({ effect, isFavorite, isDownloading, onFavorite, onApply, onPreview }) => {
-  const premiumEffect = allEffects.find((e) => e.id === effect.id);
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const canvasRef = useCallback((node: HTMLCanvasElement | null) => {
     setCanvas(node);
   }, []);
 
   useEffect(() => {
-    if (premiumEffect && canvas) {
+    if (canvas) {
       canvas.width = 250;
       canvas.height = 100;
-      renderTextEffect(canvas, "Default text", premiumEffect, 22);
+      renderTextEffect(canvas, "Default text", effect, 22);
 
       if (typeof document !== "undefined" && document.fonts) {
         document.fonts.ready.then(() => {
-          renderTextEffect(canvas, "Default text", premiumEffect, 22);
+          renderTextEffect(canvas, "Default text", effect, 22);
         });
       }
     }
-  }, [canvas, effect, premiumEffect]);
+  }, [canvas, effect]);
 
   return (
     <div onClick={onPreview} className="w-full aspect-square bg-surface-raised/40 hover:bg-surface-raised/80 border border-border/40 hover:border-accent/40 rounded-xl relative overflow-hidden flex flex-col justify-between p-2.5 transition-all duration-300 group cursor-pointer">

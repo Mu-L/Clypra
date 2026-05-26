@@ -387,7 +387,9 @@ export function normalizeFontFamily(family: string): string {
   if (f.includes("geist")) return "Geist Variable";
   if (f.includes("space grotesk") || f.includes("grotesk")) return "Space Grotesk Variable";
   if (f.includes("outfit")) return "Outfit Variable";
-  if (f.includes("roboto")) return "Roboto Variable";
+  if (f.includes("roboto condensed")) return "Roboto Condensed";
+  if (f.includes("roboto variable")) return "Roboto Variable";
+  if (f === "roboto") return "Roboto Variable";
 
   return family;
 }

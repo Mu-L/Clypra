@@ -1,4 +1,4 @@
-import { TextEffectDefinition } from "./types";
+import { TextEffectDefinition } from "../types/types";
 
 /**
  * Parses hex or rgba/rgb color strings into [r, g, b, a] numeric array.
@@ -59,21 +59,9 @@ export const interpolateColor = (color1: string, color2: string, factor: number)
  * @param fontSize - Font size in pixels.
  */
 export const applyFontConfig = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, font: TextEffectDefinition["font"], fontSize: number) => {
-  let family = font.family;
-  const f = family.toLowerCase();
-  if (f.includes("inter")) {
-    family = '"Inter Variable", sans-serif';
-  } else if (f.includes("montserrat")) {
-    family = '"Montserrat Variable", sans-serif';
-  } else if (f.includes("geist")) {
-    family = '"Geist Variable", sans-serif';
-  } else if (f.includes("space grotesk") || f.includes("grotesk")) {
-    family = '"Space Grotesk Variable", sans-serif';
-  } else if (f.includes("outfit")) {
-    family = '"Outfit Variable", sans-serif';
-  } else if (f.includes("roboto")) {
-    family = '"Roboto Variable", sans-serif';
-  }
+  const family = getFontFamilyStack(font.family);
+
+  console.info(`[Clypra Canvas Engine] Font Applied: "${font.family}" | Mapped Stack: ${family} | Size: ${fontSize}px`);
 
   ctx.font = `${font.style} ${font.weight} ${fontSize}px ${family}`;
   ctx.textBaseline = "middle";
@@ -98,12 +86,49 @@ export const clipToText = (ctx: CanvasRenderingContext2D | OffscreenCanvasRender
 
 export const getFontFamilyStack = (fontFamily: string) => {
   const f = fontFamily?.toLowerCase() || "";
+  
+  // Google Web Fonts (Variable)
   if (f.includes("inter")) return '"Inter Variable", sans-serif';
   if (f.includes("montserrat")) return '"Montserrat Variable", sans-serif';
   if (f.includes("geist")) return '"Geist Variable", sans-serif';
   if (f.includes("space grotesk") || f.includes("grotesk")) return '"Space Grotesk Variable", sans-serif';
   if (f.includes("outfit")) return '"Outfit Variable", sans-serif';
-  if (f.includes("roboto")) return '"Roboto Variable", sans-serif';
+  if (f.includes("roboto variable")) return '"Roboto Variable", sans-serif';
+  if (f.includes("roboto condensed")) return '"Roboto Condensed", sans-serif';
+  if (f === "roboto") return '"Roboto Variable", sans-serif';
+  if (f.includes("open sans")) return '"Open Sans Variable", sans-serif';
+  if (f.includes("raleway")) return '"Raleway Variable", sans-serif';
+  if (f.includes("oswald")) return '"Oswald Variable", sans-serif';
+  if (f.includes("playfair display")) return '"Playfair Display Variable", serif';
+  if (f.includes("nunito")) return '"Nunito Variable", sans-serif';
+  if (f.includes("dancing script")) return '"Dancing Script Variable", cursive';
 
-  return fontFamily;
+  // Google Web Fonts (Non-Variable / Static)
+  if (f === "lato") return '"Lato", sans-serif';
+  if (f === "anton") return '"Anton", sans-serif';
+  if (f === "bebas neue") return '"Bebas Neue", sans-serif';
+  if (f === "poppins") return '"Poppins", sans-serif';
+  if (f === "permanent marker") return '"Permanent Marker", cursive';
+  if (f === "bangers") return '"Bangers", cursive';
+  if (f === "press start 2p") return '"Press Start 2P", monospace';
+  if (f === "pacifico") return '"Pacifico", cursive';
+
+  // System Fonts
+  if (f === "arial") return 'Arial, sans-serif';
+  if (f === "arial black") return '"Arial Black", sans-serif';
+  if (f === "arial rounded mt bold") return '"Arial Rounded MT Bold", sans-serif';
+  if (f === "georgia") return 'Georgia, serif';
+  if (f === "times new roman") return '"Times New Roman", serif';
+  if (f === "courier new") return '"Courier New", monospace';
+  if (f === "impact") return 'Impact, sans-serif';
+  if (f === "verdana") return 'Verdana, sans-serif';
+  if (f === "trebuchet ms") return '"Trebuchet MS", sans-serif';
+  if (f === "palatino") return 'Palatino, serif';
+
+  // Fallbacks
+  const isMono = f.includes("mono") || f.includes("courier") || f.includes("press start");
+  const isSerif = f.includes("georgia") || f.includes("times") || f.includes("playfair");
+  const isCursive = f.includes("script") || f.includes("marker") || f.includes("bangers") || f.includes("pacifico");
+  const fallback = isMono ? "monospace" : isSerif ? "serif" : isCursive ? "cursive" : "sans-serif";
+  return `"${fontFamily}", ${fallback}`;
 };
