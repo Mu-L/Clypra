@@ -8,6 +8,8 @@
  *     Known studio bug: remove or replace any reference to undefined `className` in drawFrame.
  */
 
+import { TextEffectDefinition } from "../types/types";
+
 // ─── Config Interface ─────────────────────────────────────────────────────────
 
 export interface SolarisInkConfig {
@@ -118,9 +120,7 @@ export class SolarisInkEngine {
       panelStrokeWidth: 2,
       textPosX: "center",
       textPosY: "middle",
-      glowLayers: [
-        { enabled: true, color: "#FFDD00", blur: 20, opacity: 100, type: "outer", strength: 4, spread: 10 },
-      ],
+      glowLayers: [{ enabled: true, color: "#FFDD00", blur: 20, opacity: 100, type: "outer", strength: 4, spread: 10 }],
     };
 
     this.cfg = {
@@ -137,17 +137,7 @@ export class SolarisInkEngine {
   }
 
   drawFrame(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, _ghostFrames?: ImageData[]): void {
-    const {
-      width, height, text,
-      fontFamily, fontWeight, fontStyle, fontSize, letterSpacing, lineHeight,
-      fillType, fillColor, fillGradientAngle, fillGradientStops,
-      strokeEnabled, strokeColor, strokeWidth, strokePosition, strokeOpacity, strokeLineJoin,
-      shadowEnabled, shadowColor, shadowBlur, shadowOffsetX, shadowOffsetY, shadowOpacity, shadowType,
-      bevelEnabled, bevelDepth, bevelHighlight, bevelShadow, bevelDirection,
-      panelEnabled, panelColor, panelOpacity, panelRadius, panelPaddingX, panelPaddingY,
-      panelStrokeEnabled, panelStrokeColor, panelStrokeWidth,
-      textPosX, textPosY,
-    } = this.cfg;
+    const { width, height, text, fontFamily, fontWeight, fontStyle, fontSize, letterSpacing, lineHeight, fillType, fillColor, fillGradientAngle, fillGradientStops, strokeEnabled, strokeColor, strokeWidth, strokePosition, strokeOpacity, strokeLineJoin, shadowEnabled, shadowColor, shadowBlur, shadowOffsetX, shadowOffsetY, shadowOpacity, shadowType, bevelEnabled, bevelDepth, bevelHighlight, bevelShadow, bevelDirection, panelEnabled, panelColor, panelOpacity, panelRadius, panelPaddingX, panelPaddingY, panelStrokeEnabled, panelStrokeColor, panelStrokeWidth, textPosX, textPosY } = this.cfg;
 
     // Clear — no background color bleed allowed
     ctx.clearRect(0, 0, width, height);
@@ -200,7 +190,7 @@ export class SolarisInkEngine {
     const renderLines = (mode: "fill" | "stroke", style?: string | CanvasGradient, dx = 0, dy = 0) => {
       const prev = (ctx as any).letterSpacing;
       if (letterSpacing !== 0) (ctx as any).letterSpacing = `${letterSpacing}px`;
-      if (style) (mode === "fill" ? (ctx.fillStyle = style) : (ctx.strokeStyle = style));
+      if (style) mode === "fill" ? (ctx.fillStyle = style) : (ctx.strokeStyle = style);
       lines.forEach((line, i) => {
         const py = startY + i * fontSize * lineHeight;
         mode === "fill" ? ctx.fillText(line, startX + dx, py + dy) : ctx.strokeText(line, startX + dx, py + dy);
@@ -208,11 +198,7 @@ export class SolarisInkEngine {
       (ctx as any).letterSpacing = prev;
     };
 
-    const renderWithShadowTrick = (
-      mode: "fill" | "stroke",
-      sColor: string, sBlur: number, sOffsetX: number, sOffsetY: number,
-      opacity: number, overrideStyle = "#000", spread = 0,
-    ) => {
+    const renderWithShadowTrick = (mode: "fill" | "stroke", sColor: string, sBlur: number, sOffsetX: number, sOffsetY: number, opacity: number, overrideStyle = "#000", spread = 0) => {
       ctx.save();
       ctx.globalAlpha = opacity / 100;
       const shiftX = 10000;
@@ -223,11 +209,16 @@ export class SolarisInkEngine {
 
       const prev = (ctx as any).letterSpacing;
       if (letterSpacing !== 0) (ctx as any).letterSpacing = `${letterSpacing}px`;
-      if (mode === "fill") ctx.fillStyle = overrideStyle; else ctx.strokeStyle = overrideStyle;
+      if (mode === "fill") ctx.fillStyle = overrideStyle;
+      else ctx.strokeStyle = overrideStyle;
 
       const prevStroke = ctx.strokeStyle;
       const prevLW = ctx.lineWidth;
-      if (spread > 0) { ctx.strokeStyle = overrideStyle; ctx.lineWidth = spread * 2; ctx.lineJoin = strokeLineJoin; }
+      if (spread > 0) {
+        ctx.strokeStyle = overrideStyle;
+        ctx.lineWidth = spread * 2;
+        ctx.lineJoin = strokeLineJoin;
+      }
 
       lines.forEach((line, i) => {
         const py = startY + i * fontSize * lineHeight;
@@ -240,7 +231,10 @@ export class SolarisInkEngine {
       });
 
       (ctx as any).letterSpacing = prev;
-      if (spread > 0) { ctx.strokeStyle = prevStroke; ctx.lineWidth = prevLW; }
+      if (spread > 0) {
+        ctx.strokeStyle = prevStroke;
+        ctx.lineWidth = prevLW;
+      }
       ctx.restore();
     };
 
@@ -256,7 +250,11 @@ export class SolarisInkEngine {
       ctx.beginPath();
       ctx.roundRect(px, py, pw, ph, panelRadius);
       ctx.fill();
-      if (panelStrokeEnabled) { ctx.strokeStyle = panelStrokeColor; ctx.lineWidth = panelStrokeWidth; ctx.stroke(); }
+      if (panelStrokeEnabled) {
+        ctx.strokeStyle = panelStrokeColor;
+        ctx.lineWidth = panelStrokeWidth;
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
@@ -355,11 +353,11 @@ export class SolarisInkEngine {
 }
 
 // ─── Definition ───────────────────────────────────────────────────────────────
-// This is the metadata descriptor. Structural type — compatible with TextEffectDefinition in types/types.ts.
-
-export const SolarisInkDefinition = {
+// This is the metadata descriptor. Structural type — compatible with TextEffectDefinition.
+export const SolarisInkDefinition: TextEffectDefinition = {
   id: "solaris-ink",
   name: "Solaris Ink",
+  text: "CLYPRA",
   category: "classic",
   description: "A custom Canvas 2D text effect named Solaris Ink with solid fill.",
   tags: ["studio-export", "custom-canvas", "solid"],
@@ -383,12 +381,8 @@ export const SolarisInkDefinition = {
       },
     },
   ],
-  strokes: [
-    { color: "#000000", width: 9, position: "outside", opacity: 100, lineJoin: "round" },
-  ],
+  strokes: [{ color: "#000000", width: 9, position: "outside", opacity: 100, lineJoin: "round" }],
   shadows: [],
-  glows: [
-    { color: "#FFDD00", blur: 20, opacity: 100, type: "outer" },
-  ],
+  glows: [{ color: "#FFDD00", blur: 20, opacity: 100, type: "outer" }],
   panel: null,
 };

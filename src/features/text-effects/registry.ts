@@ -96,68 +96,77 @@ export function _buildConfig(effect: TextEffectDefinition, text: string, fontSiz
     fontSize,
     letterSpacing: effect.font.letterSpacing,
     lineHeight: effect.font.lineHeight,
-
-    // Fill — default to "none" when no fills are defined (not "solid")
-    fillType: (fill?.type ?? "none") as string,
-    fillColor: fill?.color ?? "#FFFFFF",
-    fillGradientAngle: fill?.gradient?.angle ?? 90,
-    fillGradientStops: fill?.gradient?.stops ?? [],
   };
 
-  // Stroke — only include optional properties when stroke exists
+  // Fill — default to "none" when no fills are defined (not "solid")
+  if (fill) {
+    if (fill.type !== undefined) config.fillType = fill.type;
+    if (fill.color !== undefined) config.fillColor = fill.color;
+    if (fill.gradient?.angle !== undefined) config.fillGradientAngle = fill.gradient.angle;
+    if (fill.gradient?.stops !== undefined) config.fillGradientStops = fill.gradient.stops;
+  } else {
+    config.fillType = "none";
+  }
+
+  // Stroke — only include optional properties when they are explicitly defined on the stroke object
   config.strokeEnabled = !!stroke;
   if (stroke) {
-    config.strokeColor = stroke.color ?? "#000000";
-    config.strokeWidth = stroke.width ?? 0;
-    config.strokePosition = stroke.position ?? "outside";
-    config.strokeOpacity = stroke.opacity ?? 100;
-    config.strokeLineJoin = stroke.lineJoin ?? "round";
+    if (stroke.color !== undefined) config.strokeColor = stroke.color;
+    if (stroke.width !== undefined) config.strokeWidth = stroke.width * ratio;
+    if (stroke.position !== undefined) config.strokePosition = stroke.position;
+    if (stroke.opacity !== undefined) config.strokeOpacity = stroke.opacity;
+    if (stroke.lineJoin !== undefined) config.strokeLineJoin = stroke.lineJoin;
   }
 
-  // Drop / inner shadow — only include optional properties when shadow exists
+  // Drop / inner shadow — only include optional properties when they are explicitly defined on the shadow object
   config.shadowEnabled = !!shadow && shadow.type === "drop";
   if (shadow) {
-    config.shadowColor = shadow.color ?? "#000000";
-    config.shadowBlur = shadow.blur ?? 0;
-    config.shadowOffsetX = shadow.offsetX ?? 0;
-    config.shadowOffsetY = shadow.offsetY ?? 0;
-    config.shadowOpacity = shadow.opacity ?? 100;
-    config.shadowType = shadow.type ?? "drop";
+    if (shadow.color !== undefined) config.shadowColor = shadow.color;
+    if (shadow.blur !== undefined) config.shadowBlur = shadow.blur * ratio;
+    if (shadow.offsetX !== undefined) config.shadowOffsetX = shadow.offsetX * ratio;
+    if (shadow.offsetY !== undefined) config.shadowOffsetY = shadow.offsetY * ratio;
+    if (shadow.opacity !== undefined) config.shadowOpacity = shadow.opacity;
+    if (shadow.type !== undefined) config.shadowType = shadow.type;
   }
 
-  // Bevel — only include optional properties when bevel exists
+  // Bevel — only include optional properties when they are explicitly defined on the bevel object
   config.bevelEnabled = !!bevel;
   if (bevel) {
-    config.bevelDepth = bevel.depth ?? 0;
-    config.bevelHighlight = bevel.highlightColor ?? "#FFFFFF";
-    config.bevelShadow = bevel.shadowColor ?? "#000000";
-    config.bevelDirection = bevel.direction ?? "bottom-right";
+    if (bevel.depth !== undefined) config.bevelDepth = Math.round(bevel.depth * ratio);
+    if (bevel.highlightColor !== undefined) config.bevelHighlight = bevel.highlightColor;
+    if (bevel.shadowColor !== undefined) config.bevelShadow = bevel.shadowColor;
+    if (bevel.direction !== undefined) config.bevelDirection = bevel.direction;
   }
 
-  // Panel / background — only include optional properties when panel exists
+  // Panel / background — only include optional properties when they are explicitly defined on the panel object
   config.panelEnabled = !!panel;
   if (panel) {
-    config.panelColor = panel.color ?? "#1E1E26";
-    config.panelOpacity = panel.opacity ?? 80;
-    config.panelRadius = panel.radius ?? 12;
-    config.panelPaddingX = panel.paddingX ?? 40;
-    config.panelPaddingY = panel.paddingY ?? 20;
-    config.panelStrokeEnabled = !!panel.stroke;
-    config.panelStrokeColor = panel.stroke?.color ?? "#2A2A38";
-    config.panelStrokeWidth = panel.stroke?.width ?? 2;
+    if (panel.color !== undefined) config.panelColor = panel.color;
+    if (panel.opacity !== undefined) config.panelOpacity = panel.opacity;
+    if (panel.radius !== undefined) config.panelRadius = panel.radius;
+    if (panel.paddingX !== undefined) config.panelPaddingX = panel.paddingX * ratio;
+    if (panel.paddingY !== undefined) config.panelPaddingY = panel.paddingY * ratio;
+    if (panel.stroke !== undefined) {
+      config.panelStrokeEnabled = !!panel.stroke;
+      if (panel.stroke.color !== undefined) config.panelStrokeColor = panel.stroke.color;
+      if (panel.stroke.width !== undefined) config.panelStrokeWidth = panel.stroke.width * ratio;
+    }
   }
 
   // Glow layers — proportionally scale blur and spread based on font size ratio
   if (effect.glows) {
-    config.glowLayers = effect.glows.map((g: Record<string, unknown>) => ({
-      enabled: true,
-      color: g.color,
-      blur: typeof g.blur === "number" ? g.blur * ratio : (g.blur ?? 0),
-      opacity: g.opacity,
-      type: g.type ?? "outer",
-      strength: g.strength ?? 4,
-      spread: typeof g.spread === "number" ? g.spread * ratio : ((g.spread as number ?? 10) * ratio),
-    }));
+    config.glowLayers = effect.glows.map((g: Record<string, unknown>) => {
+      const mappedGlow: any = {
+        enabled: true,
+        color: g.color,
+        blur: typeof g.blur === "number" ? g.blur * ratio : (g.blur ?? 0),
+        opacity: g.opacity,
+        type: (g.type ?? "outer") as "inner" | "outer",
+      };
+      if (g.strength !== undefined) mappedGlow.strength = g.strength;
+      if (g.spread !== undefined) mappedGlow.spread = (g.spread as number) * ratio;
+      return mappedGlow;
+    });
   }
 
   // 2. Auto-forward unrecognized Top-Level keys (e.g. isGlitchEffect, decaySpeed)

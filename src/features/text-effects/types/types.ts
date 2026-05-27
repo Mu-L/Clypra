@@ -7,6 +7,7 @@
 export interface TextEffectDefinition {
   id: string;
   name: string;
+  text: string;
   category: string;
   description: string;
   tags: string[];
@@ -16,7 +17,6 @@ export interface TextEffectDefinition {
     style: "normal" | "italic";
     letterSpacing: number;
     lineHeight: number;
-    // [key: string]: any;
   };
   fills: any[];
   strokes: any[];
@@ -24,5 +24,16 @@ export interface TextEffectDefinition {
   glows?: any[];
   bevel?: any;
   panel?: any;
-  // [key: string]: any;
+}
+
+export interface BaseEffectConfig {
+  glowLayers?: Array<{
+    enabled: boolean;
+    color: string;
+    blur: number;
+    opacity: number;
+    type: "outer" | "inner";
+    strength?: number;
+    spread?: number;
+  }>;
 }

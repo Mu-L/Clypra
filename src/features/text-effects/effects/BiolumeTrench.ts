@@ -7,6 +7,8 @@
  *     Drop the raw studio export here. The registry in registry.ts handles all wiring.
  */
 
+import { TextEffectDefinition } from "../types/types";
+
 // ─── Config Interface ─────────────────────────────────────────────────────────
 
 export interface BiolumeTrenchConfig {
@@ -116,9 +118,7 @@ export class BiolumeTrenchEngine {
       panelStrokeWidth: 2,
       textPosX: "center",
       textPosY: "middle",
-      glowLayers: [
-        { enabled: true, color: "#00F2FE", blur: 20, opacity: 60, type: "outer", strength: 1, spread: 0 },
-      ],
+      glowLayers: [{ enabled: true, color: "#00F2FE", blur: 20, opacity: 60, type: "outer", strength: 1, spread: 0 }],
     };
 
     this.cfg = {
@@ -133,17 +133,7 @@ export class BiolumeTrenchEngine {
   }
 
   drawFrame(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, _ghostFrames?: ImageData[]): void {
-    const {
-      width, height, text,
-      fontFamily, fontWeight, fontStyle, fontSize, letterSpacing, lineHeight,
-      fillType, fillColor, fillGradientAngle, fillGradientStops,
-      strokeEnabled, strokeColor, strokeWidth, strokePosition, strokeOpacity, strokeLineJoin,
-      shadowEnabled, shadowColor, shadowBlur, shadowOffsetX, shadowOffsetY, shadowOpacity, shadowType,
-      bevelEnabled, bevelDepth, bevelHighlight, bevelShadow, bevelDirection,
-      panelEnabled, panelColor, panelOpacity, panelRadius, panelPaddingX, panelPaddingY,
-      panelStrokeEnabled, panelStrokeColor, panelStrokeWidth,
-      textPosX, textPosY,
-    } = this.cfg;
+    const { width, height, text, fontFamily, fontWeight, fontStyle, fontSize, letterSpacing, lineHeight, fillType, fillColor, fillGradientAngle, fillGradientStops, strokeEnabled, strokeColor, strokeWidth, strokePosition, strokeOpacity, strokeLineJoin, shadowEnabled, shadowColor, shadowBlur, shadowOffsetX, shadowOffsetY, shadowOpacity, shadowType, bevelEnabled, bevelDepth, bevelHighlight, bevelShadow, bevelDirection, panelEnabled, panelColor, panelOpacity, panelRadius, panelPaddingX, panelPaddingY, panelStrokeEnabled, panelStrokeColor, panelStrokeWidth, textPosX, textPosY } = this.cfg;
 
     ctx.clearRect(0, 0, width, height);
     ctx.imageSmoothingEnabled = true;
@@ -191,7 +181,7 @@ export class BiolumeTrenchEngine {
     const renderLines = (mode: "fill" | "stroke", style?: string | CanvasGradient, dx = 0, dy = 0) => {
       const prev = (ctx as any).letterSpacing;
       if (letterSpacing !== 0) (ctx as any).letterSpacing = `${letterSpacing}px`;
-      if (style) (mode === "fill" ? (ctx.fillStyle = style) : (ctx.strokeStyle = style));
+      if (style) mode === "fill" ? (ctx.fillStyle = style) : (ctx.strokeStyle = style);
       lines.forEach((line, i) => {
         const py = startY + i * fontSize * lineHeight;
         mode === "fill" ? ctx.fillText(line, startX + dx, py + dy) : ctx.strokeText(line, startX + dx, py + dy);
@@ -199,11 +189,7 @@ export class BiolumeTrenchEngine {
       (ctx as any).letterSpacing = prev;
     };
 
-    const renderWithShadowTrick = (
-      mode: "fill" | "stroke",
-      sColor: string, sBlur: number, sOffsetX: number, sOffsetY: number,
-      opacity: number, overrideStyle = "#000", spread = 0,
-    ) => {
+    const renderWithShadowTrick = (mode: "fill" | "stroke", sColor: string, sBlur: number, sOffsetX: number, sOffsetY: number, opacity: number, overrideStyle = "#000", spread = 0) => {
       ctx.save();
       ctx.globalAlpha = opacity / 100;
       const shiftX = 10000;
@@ -214,11 +200,16 @@ export class BiolumeTrenchEngine {
 
       const prev = (ctx as any).letterSpacing;
       if (letterSpacing !== 0) (ctx as any).letterSpacing = `${letterSpacing}px`;
-      if (mode === "fill") ctx.fillStyle = overrideStyle; else ctx.strokeStyle = overrideStyle;
+      if (mode === "fill") ctx.fillStyle = overrideStyle;
+      else ctx.strokeStyle = overrideStyle;
 
       const prevStroke = ctx.strokeStyle;
       const prevLW = ctx.lineWidth;
-      if (spread > 0) { ctx.strokeStyle = overrideStyle; ctx.lineWidth = spread * 2; ctx.lineJoin = strokeLineJoin; }
+      if (spread > 0) {
+        ctx.strokeStyle = overrideStyle;
+        ctx.lineWidth = spread * 2;
+        ctx.lineJoin = strokeLineJoin;
+      }
 
       lines.forEach((line, i) => {
         const py = startY + i * fontSize * lineHeight;
@@ -231,7 +222,10 @@ export class BiolumeTrenchEngine {
       });
 
       (ctx as any).letterSpacing = prev;
-      if (spread > 0) { ctx.strokeStyle = prevStroke; ctx.lineWidth = prevLW; }
+      if (spread > 0) {
+        ctx.strokeStyle = prevStroke;
+        ctx.lineWidth = prevLW;
+      }
       ctx.restore();
     };
 
@@ -243,7 +237,11 @@ export class BiolumeTrenchEngine {
       ctx.beginPath();
       ctx.roundRect(xMin - panelPaddingX, yMin - panelPaddingY, xMax - xMin + 2 * panelPaddingX, textBlockHeight + 2 * panelPaddingY, panelRadius);
       ctx.fill();
-      if (panelStrokeEnabled) { ctx.strokeStyle = panelStrokeColor; ctx.lineWidth = panelStrokeWidth; ctx.stroke(); }
+      if (panelStrokeEnabled) {
+        ctx.strokeStyle = panelStrokeColor;
+        ctx.lineWidth = panelStrokeWidth;
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
@@ -344,10 +342,10 @@ export class BiolumeTrenchEngine {
 }
 
 // ─── Definition ───────────────────────────────────────────────────────────────
-
-export const BiolumeTrenchDefinition = {
+export const BiolumeTrenchDefinition: TextEffectDefinition = {
   id: "biolume-trench",
   name: "Biolume Trench",
+  text: "CLYPRA",
   category: "classic",
   description: "A custom Canvas 2D text effect named Biolume Trench with linear fill.",
   tags: ["studio-export", "custom-canvas", "linear"],
@@ -371,12 +369,8 @@ export const BiolumeTrenchDefinition = {
       },
     },
   ],
-  strokes: [
-    { color: "#001D3D", width: 5, position: "outside", opacity: 100, lineJoin: "round" },
-  ],
+  strokes: [{ color: "#001D3D", width: 5, position: "outside", opacity: 100, lineJoin: "round" }],
   shadows: [],
-  glows: [
-    { color: "#00F2FE", blur: 20, opacity: 60, type: "outer" },
-  ],
+  glows: [{ color: "#00F2FE", blur: 20, opacity: 60, type: "outer" }],
   panel: null,
 };

@@ -22,11 +22,11 @@ export const EffectCard: React.FC<EffectCardProps> = ({ effect, isFavorite, isDo
     if (canvas) {
       canvas.width = 250;
       canvas.height = 100;
-      renderTextEffect(canvas, "Default text", effect, 22);
+      renderTextEffect(canvas, effect.text, effect, 22);
 
       if (typeof document !== "undefined" && document.fonts) {
         document.fonts.ready.then(() => {
-          renderTextEffect(canvas, "Default text", effect, 22);
+          renderTextEffect(canvas, effect.text, effect, 22);
         });
       }
     }

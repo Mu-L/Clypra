@@ -104,13 +104,16 @@ export const SourcePreview: React.FC = () => {
     setGpuFailed(false);
   }, [sourceAsset?.id]);
 
-  const handleSeek = useCallback((time: number) => {
-    if (sourceAsset?.type === "text") {
-      setCurrentTime(Math.max(0, Math.min(time, 3.0)));
-      return;
-    }
-    sourceCtxRef.current?.seek(time);
-  }, [sourceAsset?.type]);
+  const handleSeek = useCallback(
+    (time: number) => {
+      if (sourceAsset?.type === "text") {
+        setCurrentTime(Math.max(0, Math.min(time, 3.0)));
+        return;
+      }
+      sourceCtxRef.current?.seek(time);
+    },
+    [sourceAsset?.type],
+  );
 
   const handlePlayPause = useCallback(() => {
     if (sourceAsset?.type === "text") {
@@ -328,7 +331,6 @@ export const SourcePreview: React.FC = () => {
 
       {/* ── Video Area ─────────────────────────────────────────────── */}
       <div className="flex-1 flex items-center justify-center overflow-hidden bg-[#06080a] relative">
-        <div className="absolute inset-0 checkerboard opacity-[0.15] pointer-events-none" />
         <div className="w-full h-full flex items-center justify-center relative z-10">
           {sourceAsset.type === "video" ? (
             useGPU && !gpuFailed ? (
@@ -375,11 +377,7 @@ export const SourcePreview: React.FC = () => {
         outPoint={sourceOutPoint}
         rightActions={
           sourceAsset.type === "text" ? (
-            <button
-              onClick={handleAddToTimeline}
-              className="flex items-center gap-1 px-2.5 h-6 rounded text-[10px] font-semibold bg-green-600/90 hover:bg-green-600 text-white cursor-pointer transition-colors"
-              title="Add text to timeline"
-            >
+            <button onClick={handleAddToTimeline} className="flex items-center gap-1 px-2.5 h-6 rounded text-[10px] font-semibold bg-green-600/90 hover:bg-green-600 text-white cursor-pointer transition-colors" title="Add text to timeline">
               <Plus className="w-3 h-3" />
               Add
             </button>

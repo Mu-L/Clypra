@@ -10,7 +10,6 @@ import { hasRegisteredEngine, renderRegisteredEffect } from "./registry";
  * To add a new effect: drop its file in effects/ and add two lines to registry.ts.
  */
 export const renderTextEffectToContext = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, text: string, effect: TextEffectDefinition, fontSize: number, _x: number, _y: number, canvasWidth: number, canvasHeight: number) => {
-  console.log("FONT FAMILY:", effect.font.family);
   // Apply baseline font config (specialized renderers override this internally)
   applyFontConfig(ctx, effect.font, fontSize);
 
@@ -43,6 +42,8 @@ export const renderTextEffectToContext = (ctx: CanvasRenderingContext2D | Offscr
 export const renderTextEffect = (canvas: HTMLCanvasElement, text: string, effect: TextEffectDefinition, fontSize: number) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
+
+  console.log("RENDER TEXT: ", effect);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   renderTextEffectToContext(ctx, text, effect, fontSize, canvas.width / 2, canvas.height / 2, canvas.width, canvas.height);
