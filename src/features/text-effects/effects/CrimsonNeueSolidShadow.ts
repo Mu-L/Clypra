@@ -1,4 +1,4 @@
-export interface InfraredDriftMontserratNoise80pxConfig {
+export interface CrimsonNeueSolidShadowConfig {
   width: number;
   height: number;
   text: string;
@@ -68,25 +68,25 @@ export interface InfraredDriftMontserratNoise80pxConfig {
   }>;
 }
 
-export class InfraredDriftMontserratNoise80pxEngine {
-  private cfg: Required<InfraredDriftMontserratNoise80pxConfig>;
+export class CrimsonNeueSolidShadowEngine {
+  private cfg: Required<CrimsonNeueSolidShadowConfig>;
 
-  constructor(config: InfraredDriftMontserratNoise80pxConfig) {
+  constructor(config: CrimsonNeueSolidShadowConfig) {
     // Merge provided configuration with static studio defaults
-    const defaults: Required<InfraredDriftMontserratNoise80pxConfig> = {
+    const defaults: Required<CrimsonNeueSolidShadowConfig> = {
       width: 800,
       height: 200,
       text: "CLYPRA",
       fontFamily: "Montserrat",
       fontWeight: 700,
       fontStyle: "normal",
-      fontSize: 80,
-      letterSpacing: 4,
+      fontSize: 100,
+      letterSpacing: 6,
       lineHeight: 1.2,
-      fillType: "pattern",
-      fillColor: "#fa0000",
+      fillType: "solid",
+      fillColor: "#FFFFFF",
       fillGradientAngle: 90,
-      patternType: "noise",
+      patternType: "chalk",
       fillGradientStops: [
         {
           color: "#FFFFFF",
@@ -103,15 +103,15 @@ export class InfraredDriftMontserratNoise80pxEngine {
       strokePosition: "outside",
       strokeOpacity: 100,
       strokeLineJoin: "round",
-      shadowEnabled: false,
-      shadowColor: "#7C6FFF",
+      shadowEnabled: true,
+      shadowColor: "#fa0000",
       shadowBlur: 0,
-      shadowOffsetX: 5,
-      shadowOffsetY: 5,
-      shadowOpacity: 80,
+      shadowOffsetX: 0,
+      shadowOffsetY: 0,
+      shadowOpacity: 100,
       shadowType: "drop",
       bevelEnabled: false,
-      bevelDepth: 2,
+      bevelDepth: 5,
       bevelHighlight: "#FFFFFF",
       bevelShadow: "#000000",
       bevelDirection: "bottom-right",
@@ -140,17 +140,7 @@ export class InfraredDriftMontserratNoise80pxEngine {
       panelStrokeWidth: 2,
       textPosX: "center",
       textPosY: "middle",
-      glowLayers: [
-        {
-          enabled: true,
-          color: "#7C6FFF",
-          blur: 0,
-          opacity: 100,
-          type: "outer",
-          strength: 20,
-          spread: 0,
-        },
-      ],
+      glowLayers: [],
     };
 
     this.cfg = {
@@ -347,7 +337,7 @@ export class InfraredDriftMontserratNoise80pxEngine {
     }
 
     // 4. Glitch RGB Splitting simulation (if applicable)
-    const isGlitchEffect = "InfraredDriftMontserratNoise80px".toLowerCase().includes("glitch") || text === "SYSTEM ERR";
+    const isGlitchEffect = "CrimsonNeueSolidShadow".toLowerCase().includes("glitch") || text === "SYSTEM ERR";
     if (isGlitchEffect) {
       ctx.save();
       ctx.globalAlpha = 0.8;
@@ -944,24 +934,24 @@ export class InfraredDriftMontserratNoise80pxEngine {
   }
 }
 
-export const InfraredDriftMontserratNoise80pxDefinition = {
-  id: "infrared-drift",
-  name: "Infrared Drift",
+export const CrimsonNeueSolidShadowDefinition = {
+  id: "crimson-neue-solid-shadow",
+  name: "Crimson Neue Solid Shadow Solid Shadow",
   text: "CLYPRA",
   category: "classic",
-  description: "A custom Canvas 2D text effect named Infrared Drift with pattern fill.",
-  tags: ["studio-export", "custom-canvas", "pattern"],
+  description: "A custom Canvas 2D text effect named Crimson Neue Solid Shadow with solid fill.",
+  tags: ["studio-export", "custom-canvas", "solid"],
   font: {
     family: "Montserrat",
     weight: 700,
     style: "normal",
-    letterSpacing: 4,
+    letterSpacing: 6,
     lineHeight: 1.2,
   },
   fills: [
     {
-      type: "pattern",
-      color: "#fa0000",
+      type: "solid",
+      color: "#FFFFFF",
       gradient: {
         angle: 90,
         stops: [
@@ -978,14 +968,18 @@ export const InfraredDriftMontserratNoise80pxDefinition = {
     },
   ],
   strokes: [],
-  shadows: [],
-  glows: [
+  shadows: [
     {
-      color: "#7C6FFF",
+      type: "drop",
+      color: "#fa0000",
       blur: 0,
+      offset: {
+        x: 0,
+        y: 0,
+      },
       opacity: 100,
-      type: "outer",
     },
   ],
+  glows: [],
   panel: null,
 } as any;

@@ -1,4 +1,4 @@
-export interface StarkContourRalewayEmpty100pxStroke2Config {
+export interface CrimsonKineticHalftoneGlowConfig {
   width: number;
   height: number;
   text: string;
@@ -68,25 +68,25 @@ export interface StarkContourRalewayEmpty100pxStroke2Config {
   }>;
 }
 
-export class StarkContourRalewayEmpty100pxStroke2Engine {
-  private cfg: Required<StarkContourRalewayEmpty100pxStroke2Config>;
+export class CrimsonKineticHalftoneGlowEngine {
+  private cfg: Required<CrimsonKineticHalftoneGlowConfig>;
 
-  constructor(config: StarkContourRalewayEmpty100pxStroke2Config) {
+  constructor(config: CrimsonKineticHalftoneGlowConfig) {
     // Merge provided configuration with static studio defaults
-    const defaults: Required<StarkContourRalewayEmpty100pxStroke2Config> = {
+    const defaults: Required<CrimsonKineticHalftoneGlowConfig> = {
       width: 800,
       height: 200,
-      text: "TEXT",
-      fontFamily: "Raleway",
+      text: "CLYPRA",
+      fontFamily: "Montserrat",
       fontWeight: 700,
       fontStyle: "normal",
-      fontSize: 100,
-      letterSpacing: 6,
+      fontSize: 80,
+      letterSpacing: 4,
       lineHeight: 1.2,
-      fillType: "none",
-      fillColor: "#FFFFFF",
+      fillType: "pattern",
+      fillColor: "#fa0000",
       fillGradientAngle: 90,
-      patternType: "chalk",
+      patternType: "halftone",
       fillGradientStops: [
         {
           color: "#FFFFFF",
@@ -97,21 +97,21 @@ export class StarkContourRalewayEmpty100pxStroke2Engine {
           offset: 100,
         },
       ],
-      strokeEnabled: true,
-      strokeColor: "#ffffff",
-      strokeWidth: 2,
+      strokeEnabled: false,
+      strokeColor: "#7C6FFF",
+      strokeWidth: 4,
       strokePosition: "outside",
       strokeOpacity: 100,
       strokeLineJoin: "round",
-      shadowEnabled: false,
-      shadowColor: "#fa0000",
+      shadowEnabled: true,
+      shadowColor: "#7C6FFF",
       shadowBlur: 0,
-      shadowOffsetX: 0,
-      shadowOffsetY: 0,
+      shadowOffsetX: 3,
+      shadowOffsetY: 3,
       shadowOpacity: 100,
       shadowType: "drop",
       bevelEnabled: false,
-      bevelDepth: 5,
+      bevelDepth: 2,
       bevelHighlight: "#FFFFFF",
       bevelShadow: "#000000",
       bevelDirection: "bottom-right",
@@ -140,7 +140,17 @@ export class StarkContourRalewayEmpty100pxStroke2Engine {
       panelStrokeWidth: 2,
       textPosX: "center",
       textPosY: "middle",
-      glowLayers: [],
+      glowLayers: [
+        {
+          enabled: true,
+          color: "#7C6FFF",
+          blur: 0,
+          opacity: 100,
+          type: "outer",
+          strength: 20,
+          spread: 0,
+        },
+      ],
     };
 
     this.cfg = {
@@ -337,7 +347,7 @@ export class StarkContourRalewayEmpty100pxStroke2Engine {
     }
 
     // 4. Glitch RGB Splitting simulation (if applicable)
-    const isGlitchEffect = "StarkContourRalewayEmpty100pxStroke2".toLowerCase().includes("glitch") || text === "SYSTEM ERR";
+    const isGlitchEffect = "CrimsonKineticHalftoneGlow".toLowerCase().includes("glitch") || text === "SYSTEM ERR";
     if (isGlitchEffect) {
       ctx.save();
       ctx.globalAlpha = 0.8;
@@ -934,31 +944,59 @@ export class StarkContourRalewayEmpty100pxStroke2Engine {
   }
 }
 
-export const StarkContourRalewayEmpty100pxStroke2Definition = {
-  id: "stark-contour",
-  name: "Stark Contour",
+export const CrimsonKineticHalftoneGlowDefinition = {
+  id: "crimson-kinetic-halftone-glow",
+  name: "Crimson Kinetic Halftone Glow Halftone Glow",
   text: "CLYPRA",
   category: "classic",
-  description: "A custom Canvas 2D text effect named Stark Contour with none fill.",
-  tags: ["studio-export", "custom-canvas", "none"],
+  description: "A custom Canvas 2D text effect named Crimson Kinetic Halftone Glow with pattern fill.",
+  tags: ["studio-export", "custom-canvas", "pattern"],
   font: {
-    family: "Raleway",
+    family: "Montserrat",
     weight: 700,
     style: "normal",
-    letterSpacing: 6,
+    letterSpacing: 4,
     lineHeight: 1.2,
   },
-  fills: [],
-  strokes: [
+  fills: [
     {
-      color: "#ffffff",
-      width: 2,
-      position: "outside",
-      opacity: 100,
-      lineJoin: "round",
+      type: "pattern",
+      color: "#fa0000",
+      gradient: {
+        angle: 90,
+        stops: [
+          {
+            color: "#FFFFFF",
+            offset: 0,
+          },
+          {
+            color: "#E0E0E0",
+            offset: 100,
+          },
+        ],
+      },
     },
   ],
-  shadows: [],
-  glows: [],
+  strokes: [],
+  shadows: [
+    {
+      type: "drop",
+      color: "#7C6FFF",
+      blur: 0,
+      offset: {
+        x: 3,
+        y: 3,
+      },
+      opacity: 100,
+    },
+  ],
+  glows: [
+    {
+      color: "#7C6FFF",
+      blur: 0,
+      opacity: 100,
+      type: "outer",
+    },
+  ],
   panel: null,
 } as any;

@@ -1,4 +1,4 @@
-export interface VoltKineticMontserratChalk80pxStroke1Config {
+export interface InfraredDriftNoiseGlowConfig {
   width: number;
   height: number;
   text: string;
@@ -68,12 +68,12 @@ export interface VoltKineticMontserratChalk80pxStroke1Config {
   }>;
 }
 
-export class VoltKineticMontserratChalk80pxStroke1Engine {
-  private cfg: Required<VoltKineticMontserratChalk80pxStroke1Config>;
+export class InfraredDriftNoiseGlowEngine {
+  private cfg: Required<InfraredDriftNoiseGlowConfig>;
 
-  constructor(config: VoltKineticMontserratChalk80pxStroke1Config) {
+  constructor(config: InfraredDriftNoiseGlowConfig) {
     // Merge provided configuration with static studio defaults
-    const defaults: Required<VoltKineticMontserratChalk80pxStroke1Config> = {
+    const defaults: Required<InfraredDriftNoiseGlowConfig> = {
       width: 800,
       height: 200,
       text: "CLYPRA",
@@ -84,9 +84,9 @@ export class VoltKineticMontserratChalk80pxStroke1Engine {
       letterSpacing: 4,
       lineHeight: 1.2,
       fillType: "pattern",
-      fillColor: "#0ff591",
+      fillColor: "#fa0000",
       fillGradientAngle: 90,
-      patternType: "chalk",
+      patternType: "noise",
       fillGradientStops: [
         {
           color: "#FFFFFF",
@@ -97,21 +97,21 @@ export class VoltKineticMontserratChalk80pxStroke1Engine {
           offset: 100,
         },
       ],
-      strokeEnabled: true,
-      strokeColor: "#d9b3ff",
-      strokeWidth: 1,
+      strokeEnabled: false,
+      strokeColor: "#7C6FFF",
+      strokeWidth: 4,
       strokePosition: "outside",
       strokeOpacity: 100,
       strokeLineJoin: "round",
       shadowEnabled: false,
-      shadowColor: "#000000",
-      shadowBlur: 10,
+      shadowColor: "#7C6FFF",
+      shadowBlur: 0,
       shadowOffsetX: 5,
       shadowOffsetY: 5,
       shadowOpacity: 80,
       shadowType: "drop",
       bevelEnabled: false,
-      bevelDepth: 5,
+      bevelDepth: 2,
       bevelHighlight: "#FFFFFF",
       bevelShadow: "#000000",
       bevelDirection: "bottom-right",
@@ -140,7 +140,17 @@ export class VoltKineticMontserratChalk80pxStroke1Engine {
       panelStrokeWidth: 2,
       textPosX: "center",
       textPosY: "middle",
-      glowLayers: [],
+      glowLayers: [
+        {
+          enabled: true,
+          color: "#7C6FFF",
+          blur: 0,
+          opacity: 100,
+          type: "outer",
+          strength: 20,
+          spread: 0,
+        },
+      ],
     };
 
     this.cfg = {
@@ -337,7 +347,7 @@ export class VoltKineticMontserratChalk80pxStroke1Engine {
     }
 
     // 4. Glitch RGB Splitting simulation (if applicable)
-    const isGlitchEffect = "VoltKineticMontserratChalk80pxStroke1".toLowerCase().includes("glitch") || text === "SYSTEM ERR";
+    const isGlitchEffect = "InfraredDriftNoiseGlow".toLowerCase().includes("glitch") || text === "SYSTEM ERR";
     if (isGlitchEffect) {
       ctx.save();
       ctx.globalAlpha = 0.8;
@@ -934,12 +944,12 @@ export class VoltKineticMontserratChalk80pxStroke1Engine {
   }
 }
 
-export const VoltKineticMontserratChalk80pxStroke1Definition = {
-  id: "volt-kinetic",
-  name: "Volt Kinetic",
+export const InfraredDriftNoiseGlowDefinition = {
+  id: "infrared-drift-noise-glow",
+  name: "Infrared Drift Noise Glow Noise Glow",
   text: "CLYPRA",
   category: "classic",
-  description: "A custom Canvas 2D text effect named Volt Kinetic with pattern fill.",
+  description: "A custom Canvas 2D text effect named Infrared Drift Noise Glow with pattern fill.",
   tags: ["studio-export", "custom-canvas", "pattern"],
   font: {
     family: "Montserrat",
@@ -951,7 +961,7 @@ export const VoltKineticMontserratChalk80pxStroke1Definition = {
   fills: [
     {
       type: "pattern",
-      color: "#0ff591",
+      color: "#fa0000",
       gradient: {
         angle: 90,
         stops: [
@@ -967,16 +977,15 @@ export const VoltKineticMontserratChalk80pxStroke1Definition = {
       },
     },
   ],
-  strokes: [
+  strokes: [],
+  shadows: [],
+  glows: [
     {
-      color: "#d9b3ff",
-      width: 1,
-      position: "outside",
+      color: "#7C6FFF",
+      blur: 0,
       opacity: 100,
-      lineJoin: "round",
+      type: "outer",
     },
   ],
-  shadows: [],
-  glows: [],
   panel: null,
 } as any;

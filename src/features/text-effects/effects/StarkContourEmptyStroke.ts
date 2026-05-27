@@ -1,4 +1,4 @@
-export interface CrimsonKineticMontserratComicsHalftone80pxGlowConfig {
+export interface StarkContourEmptyStrokeConfig {
   width: number;
   height: number;
   text: string;
@@ -68,25 +68,25 @@ export interface CrimsonKineticMontserratComicsHalftone80pxGlowConfig {
   }>;
 }
 
-export class CrimsonKineticMontserratComicsHalftone80pxGlowEngine {
-  private cfg: Required<CrimsonKineticMontserratComicsHalftone80pxGlowConfig>;
+export class StarkContourEmptyStrokeEngine {
+  private cfg: Required<StarkContourEmptyStrokeConfig>;
 
-  constructor(config: CrimsonKineticMontserratComicsHalftone80pxGlowConfig) {
+  constructor(config: StarkContourEmptyStrokeConfig) {
     // Merge provided configuration with static studio defaults
-    const defaults: Required<CrimsonKineticMontserratComicsHalftone80pxGlowConfig> = {
+    const defaults: Required<StarkContourEmptyStrokeConfig> = {
       width: 800,
       height: 200,
-      text: "CLYPRA",
-      fontFamily: "Montserrat",
+      text: "TEXT",
+      fontFamily: "Raleway",
       fontWeight: 700,
       fontStyle: "normal",
-      fontSize: 80,
-      letterSpacing: 4,
+      fontSize: 100,
+      letterSpacing: 6,
       lineHeight: 1.2,
-      fillType: "pattern",
-      fillColor: "#fa0000",
+      fillType: "none",
+      fillColor: "#FFFFFF",
       fillGradientAngle: 90,
-      patternType: "halftone",
+      patternType: "chalk",
       fillGradientStops: [
         {
           color: "#FFFFFF",
@@ -97,21 +97,21 @@ export class CrimsonKineticMontserratComicsHalftone80pxGlowEngine {
           offset: 100,
         },
       ],
-      strokeEnabled: false,
-      strokeColor: "#7C6FFF",
-      strokeWidth: 4,
+      strokeEnabled: true,
+      strokeColor: "#ffffff",
+      strokeWidth: 2,
       strokePosition: "outside",
       strokeOpacity: 100,
       strokeLineJoin: "round",
-      shadowEnabled: true,
-      shadowColor: "#7C6FFF",
+      shadowEnabled: false,
+      shadowColor: "#fa0000",
       shadowBlur: 0,
-      shadowOffsetX: 3,
-      shadowOffsetY: 3,
+      shadowOffsetX: 0,
+      shadowOffsetY: 0,
       shadowOpacity: 100,
       shadowType: "drop",
       bevelEnabled: false,
-      bevelDepth: 2,
+      bevelDepth: 5,
       bevelHighlight: "#FFFFFF",
       bevelShadow: "#000000",
       bevelDirection: "bottom-right",
@@ -140,17 +140,7 @@ export class CrimsonKineticMontserratComicsHalftone80pxGlowEngine {
       panelStrokeWidth: 2,
       textPosX: "center",
       textPosY: "middle",
-      glowLayers: [
-        {
-          enabled: true,
-          color: "#7C6FFF",
-          blur: 0,
-          opacity: 100,
-          type: "outer",
-          strength: 20,
-          spread: 0,
-        },
-      ],
+      glowLayers: [],
     };
 
     this.cfg = {
@@ -347,7 +337,7 @@ export class CrimsonKineticMontserratComicsHalftone80pxGlowEngine {
     }
 
     // 4. Glitch RGB Splitting simulation (if applicable)
-    const isGlitchEffect = "CrimsonKineticMontserratComicsHalftone80pxGlow".toLowerCase().includes("glitch") || text === "SYSTEM ERR";
+    const isGlitchEffect = "StarkContourEmptyStroke".toLowerCase().includes("glitch") || text === "SYSTEM ERR";
     if (isGlitchEffect) {
       ctx.save();
       ctx.globalAlpha = 0.8;
@@ -944,59 +934,31 @@ export class CrimsonKineticMontserratComicsHalftone80pxGlowEngine {
   }
 }
 
-export const CrimsonKineticMontserratComicsHalftone80pxGlowDefinition = {
-  id: "crimson-kinetic",
-  name: "Crimson Kinetic",
+export const StarkContourEmptyStrokeDefinition = {
+  id: "stark-contour-empty-stroke",
+  name: "Stark Contour Empty Stroke Empty Stroke",
   text: "CLYPRA",
   category: "classic",
-  description: "A custom Canvas 2D text effect named Crimson Kinetic with pattern fill.",
-  tags: ["studio-export", "custom-canvas", "pattern"],
+  description: "A custom Canvas 2D text effect named Stark Contour Empty Stroke with none fill.",
+  tags: ["studio-export", "custom-canvas", "none"],
   font: {
-    family: "Montserrat",
+    family: "Raleway",
     weight: 700,
     style: "normal",
-    letterSpacing: 4,
+    letterSpacing: 6,
     lineHeight: 1.2,
   },
-  fills: [
+  fills: [],
+  strokes: [
     {
-      type: "pattern",
-      color: "#fa0000",
-      gradient: {
-        angle: 90,
-        stops: [
-          {
-            color: "#FFFFFF",
-            offset: 0,
-          },
-          {
-            color: "#E0E0E0",
-            offset: 100,
-          },
-        ],
-      },
-    },
-  ],
-  strokes: [],
-  shadows: [
-    {
-      type: "drop",
-      color: "#7C6FFF",
-      blur: 0,
-      offset: {
-        x: 3,
-        y: 3,
-      },
+      color: "#ffffff",
+      width: 2,
+      position: "outside",
       opacity: 100,
+      lineJoin: "round",
     },
   ],
-  glows: [
-    {
-      color: "#7C6FFF",
-      blur: 0,
-      opacity: 100,
-      type: "outer",
-    },
-  ],
+  shadows: [],
+  glows: [],
   panel: null,
 } as any;

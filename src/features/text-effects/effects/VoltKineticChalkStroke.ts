@@ -1,4 +1,4 @@
-export interface CrimsonNeueBebasNeueSolid100pxGlowConfig {
+export interface VoltKineticChalkStrokeConfig {
   width: number;
   height: number;
   text: string;
@@ -68,23 +68,23 @@ export interface CrimsonNeueBebasNeueSolid100pxGlowConfig {
   }>;
 }
 
-export class CrimsonNeueBebasNeueSolid100pxGlowEngine {
-  private cfg: Required<CrimsonNeueBebasNeueSolid100pxGlowConfig>;
+export class VoltKineticChalkStrokeEngine {
+  private cfg: Required<VoltKineticChalkStrokeConfig>;
 
-  constructor(config: CrimsonNeueBebasNeueSolid100pxGlowConfig) {
+  constructor(config: VoltKineticChalkStrokeConfig) {
     // Merge provided configuration with static studio defaults
-    const defaults: Required<CrimsonNeueBebasNeueSolid100pxGlowConfig> = {
+    const defaults: Required<VoltKineticChalkStrokeConfig> = {
       width: 800,
       height: 200,
       text: "CLYPRA",
       fontFamily: "Montserrat",
       fontWeight: 700,
       fontStyle: "normal",
-      fontSize: 100,
-      letterSpacing: 6,
+      fontSize: 80,
+      letterSpacing: 4,
       lineHeight: 1.2,
-      fillType: "solid",
-      fillColor: "#FFFFFF",
+      fillType: "pattern",
+      fillColor: "#0ff591",
       fillGradientAngle: 90,
       patternType: "chalk",
       fillGradientStops: [
@@ -97,18 +97,18 @@ export class CrimsonNeueBebasNeueSolid100pxGlowEngine {
           offset: 100,
         },
       ],
-      strokeEnabled: false,
-      strokeColor: "#7C6FFF",
-      strokeWidth: 4,
+      strokeEnabled: true,
+      strokeColor: "#d9b3ff",
+      strokeWidth: 1,
       strokePosition: "outside",
       strokeOpacity: 100,
       strokeLineJoin: "round",
-      shadowEnabled: true,
-      shadowColor: "#fa0000",
-      shadowBlur: 0,
-      shadowOffsetX: 0,
-      shadowOffsetY: 0,
-      shadowOpacity: 100,
+      shadowEnabled: false,
+      shadowColor: "#000000",
+      shadowBlur: 10,
+      shadowOffsetX: 5,
+      shadowOffsetY: 5,
+      shadowOpacity: 80,
       shadowType: "drop",
       bevelEnabled: false,
       bevelDepth: 5,
@@ -337,7 +337,7 @@ export class CrimsonNeueBebasNeueSolid100pxGlowEngine {
     }
 
     // 4. Glitch RGB Splitting simulation (if applicable)
-    const isGlitchEffect = "CrimsonNeueBebasNeueSolid100pxGlow".toLowerCase().includes("glitch") || text === "SYSTEM ERR";
+    const isGlitchEffect = "VoltKineticChalkStroke".toLowerCase().includes("glitch") || text === "SYSTEM ERR";
     if (isGlitchEffect) {
       ctx.save();
       ctx.globalAlpha = 0.8;
@@ -934,24 +934,24 @@ export class CrimsonNeueBebasNeueSolid100pxGlowEngine {
   }
 }
 
-export const CrimsonNeueBebasNeueSolid100pxGlowDefinition = {
-  id: "crimson-neue",
-  name: "Crimson Neue",
+export const VoltKineticChalkStrokeDefinition = {
+  id: "volt-kinetic-chalk-stroke",
+  name: "Volt Kinetic Chalk Stroke Chalk Stroke",
   text: "CLYPRA",
   category: "classic",
-  description: "A custom Canvas 2D text effect named Crimson Neue with solid fill.",
-  tags: ["studio-export", "custom-canvas", "solid"],
+  description: "A custom Canvas 2D text effect named Volt Kinetic Chalk Stroke with pattern fill.",
+  tags: ["studio-export", "custom-canvas", "pattern"],
   font: {
     family: "Montserrat",
     weight: 700,
     style: "normal",
-    letterSpacing: 6,
+    letterSpacing: 4,
     lineHeight: 1.2,
   },
   fills: [
     {
-      type: "solid",
-      color: "#FFFFFF",
+      type: "pattern",
+      color: "#0ff591",
       gradient: {
         angle: 90,
         stops: [
@@ -967,19 +967,16 @@ export const CrimsonNeueBebasNeueSolid100pxGlowDefinition = {
       },
     },
   ],
-  strokes: [],
-  shadows: [
+  strokes: [
     {
-      type: "drop",
-      color: "#fa0000",
-      blur: 0,
-      offset: {
-        x: 0,
-        y: 0,
-      },
+      color: "#d9b3ff",
+      width: 1,
+      position: "outside",
       opacity: 100,
+      lineJoin: "round",
     },
   ],
+  shadows: [],
   glows: [],
   panel: null,
 } as any;

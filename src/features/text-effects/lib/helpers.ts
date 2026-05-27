@@ -86,7 +86,7 @@ export const clipToText = (ctx: CanvasRenderingContext2D | OffscreenCanvasRender
 
 export const getFontFamilyStack = (fontFamily: string) => {
   const f = fontFamily?.toLowerCase() || "";
-  
+
   // Google Web Fonts (Variable)
   if (f.includes("inter")) return '"Inter Variable", sans-serif';
   if (f.includes("montserrat")) return '"Montserrat Variable", sans-serif';
@@ -114,16 +114,16 @@ export const getFontFamilyStack = (fontFamily: string) => {
   if (f === "pacifico") return '"Pacifico", cursive';
 
   // System Fonts
-  if (f === "arial") return 'Arial, sans-serif';
+  if (f === "arial") return "Arial, sans-serif";
   if (f === "arial black") return '"Arial Black", sans-serif';
   if (f === "arial rounded mt bold") return '"Arial Rounded MT Bold", sans-serif';
-  if (f === "georgia") return 'Georgia, serif';
+  if (f === "georgia") return "Georgia, serif";
   if (f === "times new roman") return '"Times New Roman", serif';
   if (f === "courier new") return '"Courier New", monospace';
-  if (f === "impact") return 'Impact, sans-serif';
-  if (f === "verdana") return 'Verdana, sans-serif';
+  if (f === "impact") return "Impact, sans-serif";
+  if (f === "verdana") return "Verdana, sans-serif";
   if (f === "trebuchet ms") return '"Trebuchet MS", sans-serif';
-  if (f === "palatino") return 'Palatino, serif';
+  if (f === "palatino") return "Palatino, serif";
 
   // Fallbacks
   const isMono = f.includes("mono") || f.includes("courier") || f.includes("press start");

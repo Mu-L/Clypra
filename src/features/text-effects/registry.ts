@@ -284,17 +284,18 @@ register(StealthContourDefinition, StealthContourEngine);
 import { ToxBrimEngine, ToxBrimDefinition } from "./effects/ToxBrim";
 register(ToxBrimDefinition, ToxBrimEngine);
 
-import { VoltKineticMontserratChalk80pxStroke1Engine, VoltKineticMontserratChalk80pxStroke1Definition } from "./effects/VoltKineticMontserratChalk80pxStroke1";
-register(VoltKineticMontserratChalk80pxStroke1Definition, VoltKineticMontserratChalk80pxStroke1Engine);
+import { VoltKineticChalkStrokeEngine, VoltKineticChalkStrokeDefinition } from "./effects/VoltKineticChalkStroke";
+register(VoltKineticChalkStrokeDefinition, VoltKineticChalkStrokeEngine);
 
-import { InfraredDriftMontserratNoise80pxEngine, InfraredDriftMontserratNoise80pxDefinition } from "./effects/InfraredDriftMontserratNoise80px";
-register(InfraredDriftMontserratNoise80pxDefinition, InfraredDriftMontserratNoise80pxEngine);
+import { InfraredDriftNoiseGlowEngine, InfraredDriftNoiseGlowDefinition } from "./effects/InfraredDriftNoiseGlow";
+register(InfraredDriftNoiseGlowDefinition, InfraredDriftNoiseGlowEngine);
 
-import { CrimsonKineticMontserratComicsHalftone80pxGlowEngine, CrimsonKineticMontserratComicsHalftone80pxGlowDefinition } from "./effects/CrimsonKineticMontserratComicsHalftone80pxGlow";
-register(CrimsonKineticMontserratComicsHalftone80pxGlowDefinition, CrimsonKineticMontserratComicsHalftone80pxGlowEngine);
+import { CrimsonKineticHalftoneGlowEngine, CrimsonKineticHalftoneGlowDefinition } from "./effects/CrimsonKineticHalftoneGlow";
+register(CrimsonKineticHalftoneGlowDefinition, CrimsonKineticHalftoneGlowEngine);
 
-import { CrimsonNeueBebasNeueSolid100pxGlowEngine, CrimsonNeueBebasNeueSolid100pxGlowDefinition } from "./effects/CrimsonNeueBebasNeueSolid100pxGlow";
-register(CrimsonNeueBebasNeueSolid100pxGlowDefinition, CrimsonNeueBebasNeueSolid100pxGlowEngine);
+import { CrimsonNeueSolidShadowEngine, CrimsonNeueSolidShadowDefinition } from "./effects/CrimsonNeueSolidShadow";
+register(CrimsonNeueSolidShadowDefinition, CrimsonNeueSolidShadowEngine);
 
-import { StarkContourRalewayEmpty100pxStroke2Engine, StarkContourRalewayEmpty100pxStroke2Definition } from "./effects/StarkContourRalewayEmpty100pxStroke2";
-register(StarkContourRalewayEmpty100pxStroke2Definition, StarkContourRalewayEmpty100pxStroke2Engine);
+import { StarkContourEmptyStrokeEngine, StarkContourEmptyStrokeDefinition } from "./effects/StarkContourEmptyStroke";
+register(StarkContourEmptyStrokeDefinition, StarkContourEmptyStrokeEngine);
+
