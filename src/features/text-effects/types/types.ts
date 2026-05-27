@@ -7,7 +7,7 @@
 export interface TextEffectDefinition {
   id: string;
   name: string;
-  text: string;
+  text?: string;
   category: string;
   description: string;
   tags: string[];
@@ -24,16 +24,4 @@ export interface TextEffectDefinition {
   glows?: any[];
   bevel?: any;
   panel?: any;
-}
-
-export interface BaseEffectConfig {
-  glowLayers?: Array<{
-    enabled: boolean;
-    color: string;
-    blur: number;
-    opacity: number;
-    type: "outer" | "inner";
-    strength?: number;
-    spread?: number;
-  }>;
 }

@@ -126,8 +126,6 @@ export class SolarisInkEngine {
     this.cfg = {
       ...defaults,
       ...config,
-      // glowLayers is an array — caller's value wins, otherwise fall back to defaults
-      glowLayers: config.glowLayers ?? defaults.glowLayers,
     };
   }
 

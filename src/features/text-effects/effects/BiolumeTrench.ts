@@ -124,7 +124,6 @@ export class BiolumeTrenchEngine {
     this.cfg = {
       ...defaults,
       ...config,
-      glowLayers: config.glowLayers ?? defaults.glowLayers,
     };
   }
 

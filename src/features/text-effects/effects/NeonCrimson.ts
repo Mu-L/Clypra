@@ -4,9 +4,9 @@
  * File: NeonCrimson.ts
  */
 
-import { BaseEffectConfig, TextEffectDefinition } from "../types/types";
+import { TextEffectDefinition } from "../types/types";
 
-export interface NeonCrimsonConfig extends BaseEffectConfig {
+export interface NeonCrimsonConfig {
   width: number;
   height: number;
   text: string;
@@ -49,6 +49,15 @@ export interface NeonCrimsonConfig extends BaseEffectConfig {
   panelStrokeWidth?: number;
   textPosX?: "left" | "center" | "right";
   textPosY?: "top" | "middle" | "bottom";
+  glowLayers?: Array<{
+    enabled: boolean;
+    color: string;
+    blur: number;
+    opacity: number;
+    type: "outer" | "inner";
+    strength?: number;
+    spread?: number;
+  }>;
 }
 
 export class NeonCrimsonEngine {
@@ -108,48 +117,35 @@ export class NeonCrimsonEngine {
       panelStrokeWidth: 2,
       textPosX: "center",
       textPosY: "middle",
-      glowLayers: [],
+      glowLayers: [
+        {
+          enabled: true,
+          color: "#FF003C",
+          blur: 12,
+          opacity: 100,
+          type: "outer",
+        },
+        {
+          enabled: true,
+          color: "#FF003C",
+          blur: 35,
+          opacity: 80,
+          type: "outer",
+        },
+        {
+          enabled: true,
+          color: "#FF003C",
+          blur: 80,
+          opacity: 60,
+          type: "outer",
+        },
+      ],
     };
-
-    // Glow layers (separate assignment to avoid deep merge complexity)
-    const glowLayersVal: Array<{
-      enabled: boolean;
-      color: string;
-      blur: number;
-      opacity: number;
-      type: "inner" | "outer";
-      strength?: number;
-      spread?: number;
-    }> = [
-      {
-        enabled: true,
-        color: "#FF003C",
-        blur: 12,
-        opacity: 100,
-        type: "outer",
-      },
-      {
-        enabled: true,
-        color: "#FF003C",
-        blur: 35,
-        opacity: 80,
-        type: "outer",
-      },
-      {
-        enabled: true,
-        color: "#FF003C",
-        blur: 80,
-        opacity: 60,
-        type: "outer",
-      },
-    ] as const;
 
     this.cfg = {
       ...defaults,
       ...config,
     };
-    // Assign glow layers: prefer incoming config (from registry bridge), fallback to studio defaults
-    this.cfg.glowLayers = config.glowLayers || glowLayersVal;
   }
 
   // Satisfies standard Clypra text engine contract - For animated text effects, increments dynamic timelines

@@ -247,3 +247,7 @@ register(BitDecayDefinition, BitDecayEngine);
 // NeonCrimson
 import { NeonCrimsonEngine, NeonCrimsonDefinition } from "./effects/NeonCrimson";
 register(NeonCrimsonDefinition, NeonCrimsonEngine);
+
+// VoltSector
+import { VoltSectorEngine, VoltSectorDefinition } from "./effects/VoltSector";
+register(VoltSectorDefinition, VoltSectorEngine);

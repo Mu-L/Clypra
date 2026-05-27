@@ -21,12 +21,12 @@ export const EffectCard: React.FC<EffectCardProps> = ({ effect, isFavorite, isDo
   useEffect(() => {
     if (canvas) {
       canvas.width = 250;
-      canvas.height = 100;
-      renderTextEffect(canvas, effect.text, effect, 22);
+      canvas.height = 120;
+      renderTextEffect(canvas, effect.text || "CLYPRA", effect, 34);
 
       if (typeof document !== "undefined" && document.fonts) {
         document.fonts.ready.then(() => {
-          renderTextEffect(canvas, effect.text, effect, 22);
+          renderTextEffect(canvas, effect.text || "CLYPRA", effect, 34);
         });
       }
     }
