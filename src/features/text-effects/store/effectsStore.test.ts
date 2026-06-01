@@ -65,7 +65,7 @@ describe("useEffectsStore", () => {
     expect(state.indexLoading).toBe(false);
     expect(state.indexError).toBeNull();
     expect(state.index["metallic"]).toEqual(mockIndexItems);
-    expect(fetchMock).toHaveBeenCalledWith("https://clypra-worker-api.abdulkabirmusa.com/effects/metallic");
+    expect(fetchMock).toHaveBeenCalledWith("https://clypra-worker-api.abdulkabirmusa.com/effects/metallic", expect.any(Object));
   });
 
   test("loadCategory - failure", async () => {

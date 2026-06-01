@@ -6,7 +6,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { TemplateDefinition, TemplateCustomization } from "@/features/text-templates/types";
 import type { TabProps } from "./types";
 import { TemplateCard } from "@/components/ui/TemplateCard";
-import { TemplatePreview } from "@/features/text-templates/TemplatePreview";
 import { getActiveSessionOrNull } from "@/core/runtime/ProjectSession";
 import { useUIStore } from "@/store/uiStore";
 import { useTimelineStore, getInsertIndexForNewTrack } from "@/store/timelineStore";
@@ -17,6 +16,7 @@ import { useTemplateStore } from "@/features/text-templates/templateStore";
 import { useEffectsStore } from "@/features/text-effects/store/effectsStore";
 import { EffectGrid as NewEffectGrid } from "@/features/text-effects/components/EffectGrid";
 import { EffectPreview as NewEffectPreview } from "@/features/text-effects/components/EffectPreview";
+import { useFavoritesStore } from "@/store/favoritesStore";
 
 /**
  * Generates highly realistic, context-aware subtitle lines based on the active clip filename and path.
@@ -57,13 +57,8 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
   const [activeCategory, setActiveCategory] = useState<string>("3D");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // Template preview mode
-  const [previewTemplate, setPreviewTemplate] = useState<TemplateDefinition | null>(null);
-
-  // Local storage based favorites system for Yours / Favorites
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
-  const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
+  // Consume global favorites and downloads store
+  const { favorites, downloadedEffects, downloadedTemplates, downloadingIds, toggleFavorite, startDownload, completeDownload, cancelDownload } = useFavoritesStore();
 
   // Captioning engine states
   const [captioningState, setCaptioningState] = useState<"idle" | "analyzing" | "transcribing" | "aligning" | "stitching" | "completed">("idle");
@@ -268,69 +263,70 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
   };
 
   const handlePreview = async (item: any, type: "effect" | "template") => {
-    if (type === "template") {
-      // First select the template to ensure its Lottie JSON data is fetched
-      await selectTemplate(item);
-      setPreviewTemplate(item);
+    const itemId = item.id;
+    const isDownloaded = type === "template"
+      ? downloadedTemplates.includes(itemId)
+      : downloadedEffects.includes(itemId);
 
-      // Push initial template definition to main previewer with original data
-      useUIStore.getState().previewTextPreset(
-        {
-          ...item,
-          presetType: "template",
-          injectedData: item.lottieData,
-        },
-        type,
-      );
+    if (downloadingIds.includes(itemId)) return;
 
-      // Set active transport context to source immediately
-      const session = getActiveSessionOrNull();
-      session?.transportAuthority?.setActiveContext("source");
-      return;
+    // Set the latest targeted preview ID immediately to track user intent and resolve race conditions
+    useUIStore.getState().setPreviewMedia(itemId);
+
+    if (!isDownloaded) {
+      startDownload(itemId);
     }
 
-    // Lazy-load detailed text effect configurations on-demand for previewing
     try {
-      const fullEffect = await ClypraApi.getFullEffect(item.category, item.id);
-      useUIStore.getState().previewTextPreset(fullEffect, type);
-    } catch (err) {
-      console.error("[Clypra:TextTab] Failed to load effect details for preview:", err);
-      useUIStore.getState().previewTextPreset(item, type);
-    }
+      if (type === "template") {
+        await selectTemplate(item);
+        completeDownload(itemId, "template");
 
-    // Set active transport context to source immediately
-    const session = getActiveSessionOrNull();
-    session?.transportAuthority?.setActiveContext("source");
+        // Only project to the preview player if this item is still the active preview target
+        if (useUIStore.getState().previewMediaId === itemId) {
+          const updatedTemplate = useTemplateStore.getState().templates.find((t) => t.id === itemId) || item;
+          useUIStore.getState().previewTextPreset(
+            {
+              ...updatedTemplate,
+              presetType: "template",
+              injectedData: updatedTemplate.lottieData,
+            },
+            type,
+          );
+
+          const session = getActiveSessionOrNull();
+          session?.transportAuthority?.setActiveContext("source");
+        }
+      } else {
+        const fullEffect = await ClypraApi.getFullEffect(item.category, itemId);
+        completeDownload(itemId, "effect");
+
+        // Only project to the preview player if this item is still the active preview target
+        if (useUIStore.getState().previewMediaId === itemId) {
+          useUIStore.getState().previewTextPreset(fullEffect, type);
+
+          const session = getActiveSessionOrNull();
+          session?.transportAuthority?.setActiveContext("source");
+        }
+      }
+    } catch (err) {
+      console.error(`[Clypra:TextTab] Failed to load ${type} preview:`, err);
+      cancelDownload(itemId);
+
+      // Only project fallback if this item is still the active preview target
+      if (useUIStore.getState().previewMediaId === itemId) {
+        useUIStore.getState().previewTextPreset(item, type);
+        const session = getActiveSessionOrNull();
+        session?.transportAuthority?.setActiveContext("source");
+      }
+    }
   };
 
-  useEffect(() => {
-    const saved = localStorage.getItem("clypra_text_favorites");
-    if (saved) {
-      try {
-        setFavorites(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }, []);
-
-  // Load downloaded templates from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("clypra_downloaded_templates");
-    if (saved) {
-      try {
-        const downloaded = JSON.parse(saved);
-        setDownloadedIds(new Set(downloaded));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }, []);
+  // Category and favorites indices synchronize instantly via global Zustand store
 
   // Sync category when tab changes to avoid blank grids
   const handleTabChange = (tab: "effects" | "templates" | "yours" | "captions") => {
     setActiveTab(tab);
-    setPreviewTemplate(null);
     if (tab === "effects") {
       setActiveCategory("3D");
     } else if (tab === "templates") {
@@ -342,23 +338,17 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
     }
   };
 
-  const toggleFavorite = (id: string, e: React.MouseEvent) => {
+  const handleToggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const next = favorites.includes(id) ? favorites.filter((favId) => favId !== id) : [...favorites, id];
-    setFavorites(next);
-    localStorage.setItem("clypra_text_favorites", JSON.stringify(next));
+    toggleFavorite(id);
   };
 
   const handleDownloadAndApply = async (item: any, type: "effect" | "template", e: React.MouseEvent) => {
     e.stopPropagation();
     const itemId = item.id;
-    if (downloadingIds.has(itemId)) return;
+    if (downloadingIds.includes(itemId)) return;
 
-    setDownloadingIds((prev) => {
-      const next = new Set(prev);
-      next.add(itemId);
-      return next;
-    });
+    startDownload(itemId);
 
     // Lazy load the full vector parameters concurrently with the spinner
     let fullEffect: any = null;
@@ -371,21 +361,7 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
     }
 
     setTimeout(() => {
-      setDownloadingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(itemId);
-        return next;
-      });
-
-      // Mark as downloaded
-      setDownloadedIds((prev) => {
-        const next = new Set(prev);
-        next.add(itemId);
-        // Save to localStorage with different keys for effects and templates
-        const storageKey = type === "effect" ? "clypra_downloaded_effects" : "clypra_downloaded_templates";
-        localStorage.setItem(storageKey, JSON.stringify(Array.from(next)));
-        return next;
-      });
+      completeDownload(itemId, type);
 
       // Apply to timeline
       if (type === "effect") {
@@ -431,27 +407,10 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
       "text",
     );
     // Go back to grid and exit source preview mode
-    setPreviewTemplate(null);
     useUIStore.getState().exitSourceMode();
     const session = getActiveSessionOrNull();
     session?.transportAuthority?.setActiveContext("program");
   };
-
-  // Render Preview Mode if active
-  if (previewTemplate) {
-    return (
-      <TemplatePreview
-        template={previewTemplate}
-        onBack={() => {
-          setPreviewTemplate(null);
-          useUIStore.getState().exitSourceMode();
-          const session = getActiveSessionOrNull();
-          session?.transportAuthority?.setActiveContext("program");
-        }}
-        onAddToTimeline={handleTemplateAdd}
-      />
-    );
-  }
 
   const handleNewEffectApply = (text: string, effect: any) => {
     onAddToTimeline?.(
@@ -530,9 +489,9 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
                 {favoriteTemplatesList.length === 0 ? (
                   <p className="text-xs text-text-muted/60 italic py-2 pl-1">No favorite templates saved.</p>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2 p-1.5">
                     {favoriteTemplatesList.map((template) => (
-                      <TemplateCard key={template.id} template={template} isFavorite={true} isDownloading={downloadingIds.has(template.id)} isDownloaded={downloadedIds.has(template.id)} onFavorite={(e) => toggleFavorite(template.id, e)} onApply={(e) => handleDownloadAndApply(template, "template", e)} onPreview={() => handlePreview(template, "template")} />
+                      <TemplateCard key={template.id} template={template} isFavorite={true} isDownloading={downloadingIds.includes(template.id)} isDownloaded={downloadedTemplates.includes(template.id)} onFavorite={(e) => handleToggleFavorite(template.id, e)} onApply={(e) => handleDownloadAndApply(template, "template", e)} onPreview={() => handlePreview(template, "template")} />
                     ))}
                   </div>
                 )}
@@ -546,7 +505,7 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
             {activeTab === "templates" && (
               <div className="flex flex-col h-full">
                 {/* Category tabs for templates */}
-                <div className="relative shrink-0 border-b border-border/40 bg-surface/5 mb-3">
+                <div className="relative shrink-0 border-b border-border/40 bg-surface/5">
                   <div className="absolute left-0 top-0 bottom-0 w-3 bg-linear-to-l to-surface from-transparent pointer-events-none z-10" />
                   <div className="flex overflow-x-auto gap-2 p-1 whitespace-nowrap" style={{ scrollbarWidth: "none" }}>
                     {templateCategories.map((cat) => (
@@ -565,9 +524,9 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
                     <p className="opacity-60">Try searching other categories</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-1">
+                  <div className="grid grid-cols-2 gap-2 p-1.5">
                     {filteredTemplates.map((template) => (
-                      <TemplateCard key={template.id} template={template} isFavorite={favorites.includes(template.id)} isDownloading={downloadingIds.has(template.id)} isDownloaded={downloadedIds.has(template.id)} onFavorite={(e) => toggleFavorite(template.id, e)} onApply={(e) => handleDownloadAndApply(template, "template", e)} onPreview={() => handlePreview(template, "template")} />
+                      <TemplateCard key={template.id} template={template} isFavorite={favorites.includes(template.id)} isDownloading={downloadingIds.includes(template.id)} isDownloaded={downloadedTemplates.includes(template.id)} onFavorite={(e) => handleToggleFavorite(template.id, e)} onApply={(e) => handleDownloadAndApply(template, "template", e)} onPreview={() => handlePreview(template, "template")} />
                     ))}
                   </div>
                 )}

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { TemplateDefinition } from "@/features/text-templates/types";
-import { Download, Star, Loader2, Check } from "lucide-react";
+import { Star, Loader2, Check, Plus } from "lucide-react";
 import { LottiePlayer, LottiePlayerHandle } from "@/features/text-templates/LottiePlayer";
 import { ClypraApi } from "@/features/text-effects/api/clypraApi";
 
@@ -35,6 +35,8 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
   const shouldPlayAfterFetchRef = useRef(false);
   // Track the current fetch to allow cancellation
   const fetchAbortControllerRef = useRef<AbortController | null>(null);
+
+  const resolvedThumbnailUrl = template.thumbnailUrl || template.thumbnail || `https://raw.githubusercontent.com/AIEraDev/clypra-api/main/data/thumbnails/${template.id}.png`;
 
   // Prefetch lottieData on hover if not already loaded
   useEffect(() => {
@@ -87,7 +89,8 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
   useEffect(() => {
     if (lottieRef.current && lottieData) {
       if (loop && isHovered && shouldPlayAfterFetchRef.current) {
-        // Play animation when hovering and loop is enabled
+        // Play animation starting from the beginning (frame 0)
+        lottieRef.current.goToFrame(0);
         lottieRef.current.play();
       } else if (!loop) {
         // For non-looping templates, show thumbnail frame
@@ -100,6 +103,12 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
   const handleMouseEnter = () => {
     setIsHovered(true);
     shouldPlayAfterFetchRef.current = true;
+
+    // Reset to start and play if Lottie player is already loaded
+    if (lottieRef.current && lottieData && loop) {
+      lottieRef.current.goToFrame(0);
+      lottieRef.current.play();
+    }
   };
 
   // Handle mouse leave
@@ -107,9 +116,10 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
     setIsHovered(false);
     shouldPlayAfterFetchRef.current = false;
 
-    // Pause animation if it's playing
-    if (lottieRef.current && lottieData && loop) {
+    // Reset back to static thumbnail frame instead of pausing on active frame
+    if (lottieRef.current && lottieData) {
       lottieRef.current.pause();
+      lottieRef.current.goToFrame(template.thumbnailFrame || 0);
     }
   };
 
@@ -122,12 +132,10 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
   };
 
   // Initial calculation for static mounting percentage
-  const initPercentage = template.durationFrames && template.durationFrames > 0 ? ((template.thumbnailFrame || 0) / template.durationFrames) * 100 : 0;
-
-  console.log("TEMPLATE CARD: ", template);
+  // const initPercentage = template.durationFrames && template.durationFrames > 0 ? ((template.thumbnailFrame || 0) / template.durationFrames) * 100 : 0;
 
   return (
-    <div onClick={onPreview} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} className="w-full aspect-video bg-surface-raised/10 hover:bg-surface-raised/20 border border-border/30 hover:border-accent/40 rounded-xl relative overflow-hidden flex flex-col justify-between transition-all duration-500 group cursor-pointer shadow-[0_4px_24px_rgba(0,0,0,0.4)] hover:shadow-[0_4px_30px_rgba(139,92,246,0.15)]">
+    <div onClick={onPreview} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} className="w-full aspect-video bg-surface-raised/10 hover:bg-surface-raised/20 border border-border/30 hover:border-accent/40 rounded-md relative overflow-hidden flex flex-col justify-between transition-all duration-500 group">
       {/* Downloading Overlay */}
       {isDownloading && (
         <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px] flex items-center justify-center z-30 pointer-events-none">
@@ -138,29 +146,13 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
         </div>
       )}
 
-      {/* Favorite Star Button (hover show or active) */}
-      <button onClick={onFavorite} className={`absolute top-2 right-2 p-1.5 cursor-pointer rounded-full bg-black/60 hover:bg-black/80 border border-white/5 text-white/70 hover:text-white transition-all duration-300 z-10 pointer-events-auto ${isFavorite ? "opacity-100 text-yellow-400!" : "opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2"}`}>
-        <Star className={`w-3.5 h-3.5 ${isFavorite ? "fill-yellow-400 text-yellow-400!" : ""}`} />
-      </button>
-
       {/* Lottie Preview Container - Scales up subtly on hover */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-2 transition-transform duration-700 ease-out group-hover:scale-[1.03]">
+      <div className="absolute inset-0 flex items-center justify-center cursor-pointer p-2 transition-transform duration-700 ease-out group-hover:scale-[1.03]">
         {isLoadingLottie ? (
           <div className="flex flex-col items-center justify-center gap-2 text-text-muted">
             <Loader2 className="w-8 h-8 animate-spin text-accent" />
             <span className="text-xs font-medium">Loading...</span>
           </div>
-        ) : !loop && template.thumbnail ? (
-          // Show static thumbnail for non-looping templates
-          <img
-            src={template.thumbnail}
-            alt={template.name}
-            className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)]"
-            onError={(e) => {
-              // Fallback to placeholder if thumbnail fails to load
-              e.currentTarget.style.display = "none";
-            }}
-          />
         ) : lottieData ? (
           <LottiePlayer
             ref={lottieRef}
@@ -169,7 +161,17 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
             loop={loop}
             initialFrame={template.thumbnailFrame || 0}
             onFrameChange={handleFrameChange}
-            className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)]"
+            className="w-full h-full object-contain drop-shadow-[0_8px_16px_#00000080]"
+          />
+        ) : resolvedThumbnailUrl ? (
+          <img
+            src={resolvedThumbnailUrl}
+            alt={template.name}
+            className="w-full h-full object-contain drop-shadow-[0_8px_16px_#00000080]"
+            onError={(e) => {
+              // Fallback to placeholder if thumbnail fails to load
+              e.currentTarget.style.display = "none";
+            }}
           />
         ) : (
           <div className="flex flex-col items-center justify-center gap-2 text-text-muted">
@@ -182,26 +184,23 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
       </div>
 
       {/* Footer Info / Apply Download Button */}
-      <div className="absolute bottom-0 left-0 right-0 p-2.5 bg-linear-to-t from-black/90 via-black/40 to-transparent flex items-end justify-between z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-        <span className="text-[10px] text-white font-semibold tracking-wide truncate drop-shadow-md pr-4">{template.name}</span>
+      <div className="absolute bottom-0 left-0 right-0 p-1 cursor-default flex items-end justify-between z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+        {/* Favorite Star Button (hover show or active) */}
+        <button onClick={onFavorite} className={`w-4 h-4 bg-surface/70 cursor-pointer flex justify-center items-center rounded-full hover:bg-surface/80 border border-border/50 text-text-muted hover:text-text-primary transition-all duration-300 z-10 pointer-events-auto ${isFavorite ? "opacity-100 text-yellow-400!" : "opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2"}`}>
+          <Star className={`w-2.5 h-2.5 ${isFavorite ? "fill-yellow-400 text-yellow-400!" : ""}`} />
+        </button>
+
         <button
           onClick={(e) => {
             e.stopPropagation();
             onApply(e);
           }}
           disabled={isDownloading}
-          className={`w-6 h-6 rounded-full flex items-center justify-center text-white transition-all duration-300 relative shadow-lg pointer-events-auto group/btn ${isDownloaded ? "bg-green-500/30 border border-green-500 text-green-500 cursor-default" : isDownloading ? "bg-accent/30 border border-accent cursor-wait" : "bg-accent hover:bg-accent/80 border border-white/10 cursor-pointer"}`}
+          className={`w-4 h-4 bg-surface/70 cursor-pointer flex justify-center items-center rounded-full text-text-primary transition-all duration-300 relative pointer-events-auto group/btn ${isDownloaded ? "bg-accent/20 border border-accent text-accent cursor-default" : isDownloading ? "bg-accent/30 border border-accent cursor-wait" : "bg-accent hover:bg-accent/80 border border-border/50 cursor-pointer"}`}
         >
-          {isDownloading ? <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" /> : isDownloaded ? <Check className="w-3.5 h-3.5" /> : <Download className="w-3 h-3 group-hover/btn:scale-110 transition-transform" />}
+          {isDownloading ? <div className="w-2.5 h-2.5 rounded-full border-2 border-white border-t-transparent animate-spin" /> : isDownloaded ? <Check className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5 group-hover/btn:scale-110 transition-transform" />}
         </button>
       </div>
-
-      {/* Sleek, Off-React Timeline Playback Progress Bar */}
-      {loop && (
-        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/5 overflow-hidden z-20 pointer-events-none">
-          <div ref={progressBarRef} style={{ width: `${initPercentage}%` }} className="h-full bg-linear-to-r from-accent to-accent-soft rounded-r-full transition-[width] duration-75 ease-out shadow-[0_0_8px_rgba(139,92,246,0.8)]" />
-        </div>
-      )}
     </div>
   );
 };

@@ -1,10 +1,48 @@
 import { beforeAll, afterAll, describe, test, expect, vi } from "vitest";
 import { renderTextEffect, renderTextEffectToDataURL } from "./renderer";
 import { TextEffectDefinition } from "./types/types";
-import { SolarisInkDefinition } from "./effects/SolarisInk";
-import { BiolumeTrenchDefinition } from "./effects/BiolumeTrench";
-import { BitDecayDefinition } from "./effects/BitDecay";
-import { NeonCrimsonDefinition } from "./effects/NeonCrimson";
+const SolarisInkDefinition: TextEffectDefinition = {
+  id: "solaris-ink",
+  name: "Solaris Ink",
+  category: "metallic",
+  font: { family: "Inter", weight: 700, style: "normal", letterSpacing: 0, lineHeight: 1.2 },
+  fills: [{ type: "solid", color: "#FFA751" }],
+  strokes: [{ color: "#FFA751", width: 2, position: "outside", opacity: 1 }],
+  shadows: [],
+  glows: [],
+};
+
+const BiolumeTrenchDefinition: TextEffectDefinition = {
+  id: "biolume-trench",
+  name: "Biolume Trench",
+  category: "gradient",
+  font: { family: "Inter", weight: 700, style: "normal", letterSpacing: 0, lineHeight: 1.2 },
+  fills: [{ type: "solid", color: "#FFE259" }],
+  strokes: [{ color: "#FFA751", width: 2, position: "outside", opacity: 1 }],
+  shadows: [],
+  glows: [],
+};
+
+const BitDecayDefinition: TextEffectDefinition = {
+  id: "bit-decay",
+  name: "Bit Decay",
+  category: "retro",
+  font: { family: "Inter", weight: 700, style: "normal", letterSpacing: 0, lineHeight: 1.2 },
+  fills: [{ type: "solid", color: "#FFE259" }],
+  strokes: [{ color: "#FFA751", width: 2, position: "outside", opacity: 1 }],
+  shadows: [],
+};
+
+const NeonCrimsonDefinition: TextEffectDefinition = {
+  id: "neon-crimson",
+  name: "NeonCrimson",
+  category: "neon",
+  font: { family: "Inter", weight: 700, style: "normal", letterSpacing: 0, lineHeight: 1.2 },
+  fills: [],
+  strokes: [{ color: "#FFA751", width: 2, position: "outside", opacity: 1 }],
+  shadows: [],
+  glows: [],
+};
 
 const moltenGold3d: TextEffectDefinition = {
   id: "molten-gold-3d",
