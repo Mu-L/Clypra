@@ -38,20 +38,3 @@ export const TextSourcePreview: React.FC<{ preset: any }> = ({ preset }) => {
     </div>
   );
 };
-
-  if (!preset) return null;
-
-  if (isTemplate) {
-    return (
-      <div className="w-full aspect-video bg-black flex items-center justify-center relative p-8 shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-white/5 overflow-hidden">
-        <LottiePlayer lottieData={preset.injectedData || preset.lottieData} autoplay={true} loop={true} className="w-full h-full object-contain" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full aspect-video flex items-center justify-center relative border-white/5 overflow-hidden">
-      <canvas ref={canvasRef} className="max-w-full max-h-full block select-none pointer-events-none" />
-    </div>
-  );
-};

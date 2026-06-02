@@ -264,9 +264,7 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
 
   const handlePreview = async (item: any, type: "effect" | "template") => {
     const itemId = item.id;
-    const isDownloaded = type === "template"
-      ? downloadedTemplates.includes(itemId)
-      : downloadedEffects.includes(itemId);
+    const isDownloaded = type === "template" ? downloadedTemplates.includes(itemId) : downloadedEffects.includes(itemId);
 
     if (downloadingIds.includes(itemId)) return;
 
@@ -437,7 +435,6 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
       </div>
     );
   }
-
   // Filter items - templates only (effects are handled by EffectGrid)
   const filteredTemplates = templates.filter((template) => (activeCategory === "All" || template.category.toLowerCase().replace("-", " ") === activeCategory.toLowerCase()) && template.name.toLowerCase().includes(searchQuery.toLowerCase()));
 

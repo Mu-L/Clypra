@@ -15,7 +15,7 @@ interface EffectGridProps {
 
 export function EffectGrid({ searchQuery = "" }: EffectGridProps) {
   const [activeCategory, setActiveCategory] = useState("3d");
-  const { index, indexLoading, indexError, loadCategory, selectEffect } = useEffectsStore();
+  const { index, indexLoading, indexError, loadCategory } = useEffectsStore();
 
   // Consume global favorites and downloads store
   const { favorites, downloadedEffects, downloadingIds, toggleFavorite, startDownload, completeDownload, cancelDownload } = useFavoritesStore();
@@ -76,12 +76,9 @@ export function EffectGrid({ searchQuery = "" }: EffectGridProps) {
       // Mark as downloaded
       completeDownload(itemId, "effect");
 
-      // Only open sidebar and project preview if this item is still the active preview target
+      // Only project to the preview player if this item is still the active preview target
       if (useUIStore.getState().previewMediaId === itemId) {
-        // Select the effect locally to open the sidebar editor
-        await selectEffect(itemId, item.category);
-
-        // Project preview to the main player canvas
+        // Send directly to the main preview player — same as template preview flow
         useUIStore.getState().previewTextPreset(fullEffect, "effect");
 
         // Activate transport source context
@@ -91,6 +88,13 @@ export function EffectGrid({ searchQuery = "" }: EffectGridProps) {
     } catch (e) {
       console.error("[EffectGrid] Failed to push to main player:", e);
       cancelDownload(itemId);
+
+      // Fallback: still preview with partial data if this item is still the active target
+      if (useUIStore.getState().previewMediaId === itemId) {
+        useUIStore.getState().previewTextPreset(item, "effect");
+        const session = getActiveSessionOrNull();
+        session?.transportAuthority?.setActiveContext("source");
+      }
     }
   };
 

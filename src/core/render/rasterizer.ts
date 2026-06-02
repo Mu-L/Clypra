@@ -17,9 +17,8 @@
 
 import type { EvaluatedScene, EvaluatedMediaLayer, EvaluatedTextLayer } from "../evaluation/types";
 import { getResourceCache } from "../resources/ResourceCache";
-import { renderTextEffectToContext } from "../../features/text-effects/renderer";
 import { _buildConfig } from "../../features/text-effects/registry";
-import { renderTextEffectCore, defaultConfig as engineDefaultConfig, evaluateScene, textEffectConfigToScene, type TextEffectConfig } from "@clypra/engine";
+import { defaultConfig as engineDefaultConfig, evaluateScene, textEffectConfigToScene, type TextEffectConfig } from "@clypra/engine";
 import { useEffectsStore } from "../../features/text-effects/store/effectsStore";
 
 /**

@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, describe, test, expect, vi } from "vitest";
-import { renderTextEffect, renderTextEffectToDataURL } from "./renderer";
+import { renderTextEffect, renderTextEffectToDataURL, renderTextEffectAsync } from "./renderer";
 import { TextEffectDefinition } from "./types/types";
 const SolarisInkDefinition: TextEffectDefinition = {
   id: "solaris-ink",
@@ -178,6 +178,19 @@ beforeAll(() => {
   });
 
   HTMLCanvasElement.prototype.toDataURL = vi.fn(() => "data:image/png;base64,mockedDataURL");
+
+  const mockFonts = {
+    check: vi.fn(() => true),
+    load: vi.fn(() => Promise.resolve()),
+    ready: Promise.resolve(),
+  };
+  if (typeof document !== "undefined") {
+    // @ts-ignore
+    document.fonts = mockFonts;
+  } else {
+    // @ts-ignore
+    global.document = { fonts: mockFonts };
+  }
 });
 
 afterAll(() => {
@@ -443,6 +456,15 @@ describe("Clypra Text Effects Engine & Presets", () => {
       expect(dataURL).toBeDefined();
       expect(typeof dataURL).toBe("string");
       expect(dataURL.startsWith("data:image/png;base64,")).toBe(true);
+    });
+  });
+
+  describe("renderTextEffectAsync", () => {
+    test("should load fonts and render without throwing", async () => {
+      const canvas = document.createElement("canvas");
+      await expect(
+        renderTextEffectAsync(canvas, "CLYPRA", SolarisInkDefinition, 48)
+      ).resolves.not.toThrow();
     });
   });
 });

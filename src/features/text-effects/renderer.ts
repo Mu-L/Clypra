@@ -1,6 +1,7 @@
 import { evaluateScene, textEffectConfigToScene, defaultConfig as engineDefaultConfig, WebGLCompositor, type TextEffectConfig } from "@clypra/engine";
 import { TextEffectDefinition } from "./types/types";
 import { hasRegisteredEngine, renderRegisteredEffect, _buildConfig } from "./registry";
+import { getFontLoader } from "@/core/fonts/FontLoader";
 
 // ─── ctx.filter support detection ────────────────────────────────────────────
 // Tauri WebView (WKWebView on macOS) does not support ctx.filter, which the
@@ -144,7 +145,7 @@ export const renderTextEffect = (canvas: HTMLCanvasElement, text: string, effect
  *
  * This is the correct entry point for preview rendering. It:
  * 1. Sets canvas dimensions
- * 2. Injects the required Google Font if needed
+ * 2. Injects/Loads the required font if needed via FontLoader
  * 3. Waits for the font to load
  * 4. Draws via evaluateScene (full engine pipeline including ctx.filter)
  * 5. Re-draws after document.fonts.ready to catch any late-loading variants
@@ -160,10 +161,25 @@ export const renderTextEffectAsync = async (canvas: HTMLCanvasElement, text: str
 
   const cfg = buildEngineConfig(effect, text, fontSize, canvas.width, canvas.height, time);
 
-  // Step 2 — All fonts are pre-loaded via Fontsource imports in index.css.
-  // Wait for document.fonts.ready to ensure they are fully registered before
+  // Step 2 — Injects/Loads the required font if needed.
+  if (effect?.font?.family) {
+    try {
+      const fontLoader = getFontLoader();
+      await fontLoader.ensureFont({
+        family: effect.font.family,
+        weight: effect.font.weight,
+        style: effect.font.style,
+      });
+    } catch (error) {
+      console.warn(`[TextEffects] Failed to pre-load font "${effect.font.family}":`, error);
+    }
+  }
+
+  // Wait for document.fonts.ready to ensure all fonts are fully registered before
   // the first draw, preventing fallback-font renders.
-  await document.fonts.ready;
+  if (typeof document !== "undefined" && document.fonts) {
+    await document.fonts.ready;
+  }
 
   // Step 3 — Draw (routes through WebGLCompositor if ctx.filter unsupported)
   const draw = () => drawScene(ctx, cfg, time ?? 0);
