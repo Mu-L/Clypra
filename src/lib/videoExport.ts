@@ -12,7 +12,7 @@ import { invoke, Channel, convertFileSrc } from "@tauri-apps/api/core";
 import { normalizePathForTauriInvoke } from "./tauri";
 import { getFrameScheduler } from "../core/scheduler/FrameScheduler";
 import { VideoElementPool } from "../core/resources/VideoElementPool";
-import type { Clip, Track, MediaAsset, Project } from "../types";
+import type { Clip, Track, MediaAsset, Project, TransitionTimelineItem } from "../types";
 
 /**
  * Export progress callback.
@@ -43,6 +43,9 @@ export interface VideoExportConfig {
 
   /** Timeline tracks */
   tracks: Track[];
+
+  /** Timeline transitions */
+  transitions?: TransitionTimelineItem[];
 
   /** Media assets */
   assets: MediaAsset[];
@@ -116,7 +119,7 @@ export interface VideoExportResult {
  * @returns Export result
  */
 export async function exportVideo(config: VideoExportConfig): Promise<VideoExportResult> {
-  const { clips, tracks, assets, project, epoch, startTime, endTime, outputPath, frameRate = project?.frameRate || 30, width = project?.canvasWidth || 1920, height = project?.canvasHeight || 1080, codec = "h264", preset = "medium", crf = 23, pixelFormat = "yuv420p", onProgress } = config;
+  const { clips, tracks, transitions = [], assets, project, epoch, startTime, endTime, outputPath, frameRate = project?.frameRate || 30, width = project?.canvasWidth || 1920, height = project?.canvasHeight || 1080, codec = "h264", preset = "medium", crf = 23, pixelFormat = "yuv420p", onProgress } = config;
 
   const startTimeMs = Date.now();
 
@@ -133,7 +136,7 @@ export async function exportVideo(config: VideoExportConfig): Promise<VideoExpor
 
   // Get scheduler and update timeline state
   const scheduler = getFrameScheduler();
-  scheduler.updateTimeline(clips, tracks, assets, project, epoch);
+  scheduler.updateTimeline(clips, tracks, assets, project, epoch, transitions);
 
   // Create headless video element pool for export
   const videoPool = new VideoElementPool({

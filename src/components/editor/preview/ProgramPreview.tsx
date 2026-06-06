@@ -50,6 +50,7 @@ export const ProgramPreview: React.FC = () => {
   const mediaAssets = useProjectStore((s) => s.mediaAssets);
   const tracks = useTimelineStore((s) => s.tracks);
   const clips = useTimelineStore((s) => s.clips);
+  const transitions = useTimelineStore((s) => s.transitions);
   const epoch = useTimelineStore((s) => s.epoch);
   const clearSelection = useUIStore((s) => s.clearSelection);
   const { previewViewport } = useUIStore();
@@ -104,9 +105,10 @@ export const ProgramPreview: React.FC = () => {
   const prevFrameRateRef = useRef<number>(0);
 
   const renderStateRef = useRef({
-    clips,
-    tracks,
-    mediaAssets,
+	    clips,
+	    tracks,
+	    transitions,
+	    mediaAssets,
     project,
     epoch,
     clock,
@@ -121,9 +123,10 @@ export const ProgramPreview: React.FC = () => {
 
   // Sync refs on every render
   showTelemetryRef.current = showTelemetry;
-  renderStateRef.current.clips = clips;
-  renderStateRef.current.tracks = tracks;
-  renderStateRef.current.mediaAssets = mediaAssets;
+	  renderStateRef.current.clips = clips;
+	  renderStateRef.current.tracks = tracks;
+	  renderStateRef.current.transitions = transitions;
+	  renderStateRef.current.mediaAssets = mediaAssets;
   renderStateRef.current.project = project;
   renderStateRef.current.epoch = epoch;
   renderStateRef.current.clock = clock;
@@ -157,8 +160,8 @@ export const ProgramPreview: React.FC = () => {
   renderStateRef.current.canvasHeight = canvasHeight;
 
   const scene = useMemo(() => {
-    return evaluateTimelineSceneCached(clockState.time, clips, tracks, mediaAssets, project ?? null, epoch);
-  }, [tracks, clips, mediaAssets, clockState.time, project, epoch]);
+    return evaluateTimelineSceneCached(clockState.time, clips, tracks, mediaAssets, project ?? null, epoch, transitions);
+  }, [tracks, clips, transitions, mediaAssets, clockState.time, project, epoch]);
 
   // =========================================================================
   // 7. EVENT HANDLERS & CALLBACKS (useCallback)
@@ -368,7 +371,7 @@ export const ProgramPreview: React.FC = () => {
       isRendering = true;
       const state = renderStateRef.current;
       const timeToRender = state.clock.time;
-      scheduler.updateTimeline(state.clips, state.tracks, state.mediaAssets, state.project, state.epoch);
+      scheduler.updateTimeline(state.clips, state.tracks, state.mediaAssets, state.project, state.epoch, state.transitions);
       const qm = qualityManagerRef.current;
       const isPlaying = state.clockState.state === "playing";
       const qualityTier = qm ? qm.selectTierForInteraction(isPlaying, false, false, state.previewQuality) : PreviewQualityTier.Idle;
