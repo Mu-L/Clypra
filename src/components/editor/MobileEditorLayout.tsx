@@ -17,13 +17,17 @@ import { autoAdaptSequenceForFirstVisualClip } from "@/lib/sequenceAutoAspect";
 import { DEFAULT_PLACEMENT_POLICY, resolveAddToTimelinePlacement, resolveDefaultFitModeForAsset } from "@/lib/placementPolicy";
 import { getPlaybackClock } from "@/hooks/usePlaybackClock";
 import type { TabType } from "./media-tabs";
+import type { MediaAsset } from "@/types";
+import { useAudioLibraryStore } from "@/features/audio-library/store/audioLibraryStore";
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 export const MobileEditorLayout: React.FC = () => {
   const { tracks, clips, addClip, addTrack, insertTrackAt, getTimelineEndTime } = useTimelineStore();
-  const { mediaAssets, project, updateProject } = useProjectStore();
+  const { mediaAssets, project, updateProject, addMediaAsset } = useProjectStore();
   const { selectedClipIds } = useUIStore();
   const { undo, redo, state: historyState } = useHistoryStore();
   const { importMedia, isLoading: isImporting } = useMediaImport();
+  const { getCachedFile } = useAudioLibraryStore();
 
   const [mediaSheetOpen, setMediaSheetOpen] = useState(false);
   const [activeMediaTab, setActiveMediaTab] = useState<TabType>("media");
@@ -126,6 +130,55 @@ export const MobileEditorLayout: React.FC = () => {
       });
 
       addClip(textClip);
+    } else if (type === "audio" && item?.audioUrl) {
+      // Audio library item - must be downloaded first
+      const cachedFile = getCachedFile(item.id);
+
+      if (!cachedFile) {
+        console.error("[MobileEditorLayout] Audio not downloaded yet:", item.id);
+        return;
+      }
+
+      // Use local cached file path
+      const mediaAsset: MediaAsset = {
+        id: `audio-library-${item.id}`,
+        name: item.name || "Library Audio",
+        path: cachedFile.localPath, // Use local cached file path
+        type: "audio",
+        duration: cachedFile.metadata.duration || Number(item.duration) || 5,
+        size: cachedFile.size,
+        coverArt: item.coverArtUrl,
+      };
+
+      addMediaAsset(mediaAsset);
+
+      const latestTracks = useTimelineStore.getState().tracks;
+      const latestClips = useTimelineStore.getState().clips;
+      const placement = resolveAddToTimelinePlacement({
+        asset: mediaAsset,
+        tracks: latestTracks,
+        clips: latestClips,
+        playheadTime: getPlaybackClock().time,
+        sequenceEndTime: getTimelineEndTime(),
+      });
+      let targetTrackId = placement.targetTrackId;
+      if (placement.shouldCreateTrack || !targetTrackId) {
+        const insertIndex = getInsertIndexForNewTrack(useTimelineStore.getState().tracks, "audio");
+        targetTrackId = insertTrackAt("audio", insertIndex);
+      }
+
+      if (!targetTrackId) return;
+
+      addClip(
+        createClipFromAsset({
+          asset: mediaAsset,
+          trackId: targetTrackId,
+          startTime: placement.startTime,
+          width: project?.canvasWidth || 1920,
+          height: project?.canvasHeight || 1080,
+          fitMode: resolveDefaultFitModeForAsset(mediaAsset),
+        }),
+      );
     }
   };
 

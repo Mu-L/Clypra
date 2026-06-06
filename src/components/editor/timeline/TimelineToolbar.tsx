@@ -166,9 +166,8 @@ export const TimelineToolbar: React.FC = () => {
 
     commitTransaction();
 
-    // Normalize tracks after deletion (not part of undo/redo)
+    // Remove empty tracks after deletion (not part of undo/redo)
     withBatch(() => {
-      affectedTracks.forEach((trackId) => normalizeTrack(trackId));
       removeEmptyNonMainTracks(Array.from(affectedTracks));
     });
 

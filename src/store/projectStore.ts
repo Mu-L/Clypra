@@ -24,7 +24,7 @@
  */
 
 import { create } from "zustand";
-import type { Project, MediaAsset } from "@/types";
+import type { Project, MediaAsset, TransitionTimelineItem } from "@/types";
 import { MAX_PROJECT_NAME_LENGTH } from "@/types";
 import { toRustProject } from "@/types/serialization";
 import { generateId } from "@/lib/id";
@@ -41,7 +41,7 @@ interface ProjectStore {
   /** Convenience: show toast with variant and auto-dismiss. */
   showToast: (message: string, variant?: "success" | "error" | "warning", durationMs?: number) => void;
   createProject: (name: string, aspectRatio: string, frameRate: 24 | 30 | 60) => void;
-  loadProject: (project: Project, payload?: { tracks?: any[]; clips?: any[]; mediaAssets?: MediaAsset[] }) => Promise<void> | void;
+  loadProject: (project: Project, payload?: { tracks?: any[]; clips?: any[]; transitions?: TransitionTimelineItem[]; mediaAssets?: MediaAsset[] }) => Promise<void> | void;
   addMediaAsset: (asset: MediaAsset) => void;
   removeMediaAsset: (assetId: string) => void;
   updateProject: (updates: Partial<Project>) => void;
@@ -89,6 +89,44 @@ const getAspectRatioDimensions = (ratio: string): { width: number; height: numbe
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 const AUTO_SAVE_DELAY = 500; // ms
 
+async function preloadTextEffectDefinitionsFromClips(clips: any[] | undefined): Promise<void> {
+  if (!clips?.length) return;
+
+  const styleIds = Array.from(new Set(clips.map((clip) => clip?.styleId).filter((id): id is string => typeof id === "string" && id.length > 0)));
+  const embeddedDefinitions = clips
+    .map((clip) => clip?.styleDefinition ?? clip?.style_definition)
+    .filter((definition) => definition && typeof definition.id === "string");
+
+  if (styleIds.length === 0 && embeddedDefinitions.length === 0) return;
+
+  try {
+    const { useEffectsStore } = await import("@/features/text-effects/store/effectsStore");
+
+    if (embeddedDefinitions.length > 0) {
+      useEffectsStore.setState((state) => {
+        const definitions = { ...state.definitions };
+        for (const definition of embeddedDefinitions) {
+          definitions[definition.id] = definition;
+        }
+        return { definitions };
+      });
+    }
+
+    const store = useEffectsStore.getState();
+    const missingStyleIds = styleIds.filter((id) => !useEffectsStore.getState().definitions[id]);
+    if (missingStyleIds.length === 0) return;
+
+    const results = await Promise.allSettled(missingStyleIds.map((id) => store.fetchDefinitionOnlyById(id)));
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.warn(`[LoadProject] Failed to preload text effect definition ${missingStyleIds[index]}:`, result.reason);
+      }
+    });
+  } catch (err) {
+    console.warn("[LoadProject] Text effect definition preload failed:", err);
+  }
+}
+
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   project: null,
   mediaAssets: [],
@@ -116,9 +154,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       aspectRatio: aspectRatio as any,
       canvasWidth: dims.width,
       canvasHeight: dims.height,
-      frameRate,
-      duration: 0,
-    };
+	      frameRate,
+	      duration: 0,
+	      timelineSchemaVersion: 1,
+	    };
     set({ project, mediaAssets: [] });
 
     // Let timelineStore reset its own state
@@ -152,13 +191,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     // Apply project and mediaAssets (projectStore owns these)
     set({ project, mediaAssets: payload?.mediaAssets ?? [] });
 
+    await preloadTextEffectDefinitionsFromClips(payload?.clips);
+
     // Let timelineStore hydrate its own state (respects ownership boundary)
     try {
       const { useTimelineStore } = await import("./timelineStore");
       useTimelineStore.getState().hydrateFromProject({
-        tracks: payload?.tracks ?? [],
-        clips: payload?.clips ?? [],
-      });
+	        tracks: payload?.tracks ?? [],
+	        clips: payload?.clips ?? [],
+	        transitions: payload?.transitions ?? [],
+	      });
     } catch (err) {
       // On error, reset timeline to empty state
       import("./timelineStore").then(({ useTimelineStore }) => useTimelineStore.getState().hydrateFromProject({ tracks: [], clips: [] })).catch((resetErr) => console.error("[LoadProject] Failed to reset timeline:", resetErr));
@@ -269,10 +311,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       if (project) {
         try {
           const { useTimelineStore } = await import("./timelineStore");
-          const { tracks, clips } = useTimelineStore.getState();
+	          const { tracks, clips, transitions } = useTimelineStore.getState();
 
-          // Convert camelCase to snake_case using centralized serialization
-          const rustProject = toRustProject(project, { tracks, clips, mediaAssets });
+	          // Convert camelCase to snake_case using centralized serialization
+	          const rustProject = toRustProject(project, { tracks, clips, transitions, mediaAssets });
 
           const { invoke } = await import("@tauri-apps/api/core");
           await invoke("save_project", {
@@ -323,10 +365,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       try {
         // Import timeline store to get tracks and clips
         const { useTimelineStore } = await import("./timelineStore");
-        const { tracks, clips } = useTimelineStore.getState();
+	        const { tracks, clips, transitions } = useTimelineStore.getState();
 
-        // Convert camelCase to snake_case using centralized serialization
-        const rustProject = toRustProject(project, { tracks, clips, mediaAssets });
+	        // Convert camelCase to snake_case using centralized serialization
+	        const rustProject = toRustProject(project, { tracks, clips, transitions, mediaAssets });
 
         const { invoke } = await import("@tauri-apps/api/core");
         await invoke("save_project", {

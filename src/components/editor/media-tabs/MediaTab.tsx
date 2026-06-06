@@ -157,9 +157,8 @@ export const MediaTab: React.FC<MediaTabProps> = ({ onAddToTimeline }) => {
 
                     commitTransaction();
 
-                    // Normalize affected tracks to close gaps (not part of undo/redo)
+                    // Remove empty tracks after deletion (not part of undo/redo)
                     withBatch(() => {
-                      affectedTracks.forEach((trackId) => normalizeTrack(trackId));
                       removeEmptyNonMainTracks(Array.from(affectedTracks));
                     });
                   },

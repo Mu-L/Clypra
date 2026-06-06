@@ -81,8 +81,9 @@ const App = () => {
       const mediaAssetsPayload = project.mediaAssets ?? [];
       const tracksPayload = rustProject.tracks?.map(fromRustTrack) ?? [];
       const clipsPayload = rustProject.clips?.map(fromRustClip) ?? [];
+      const transitionsPayload = rustProject.transitions ?? [];
 
-      await loadProject(project, { mediaAssets: mediaAssetsPayload, tracks: tracksPayload, clips: clipsPayload });
+      await loadProject(project, { mediaAssets: mediaAssetsPayload, tracks: tracksPayload, clips: clipsPayload, transitions: transitionsPayload });
 
       setTimeout(async () => {
         const { useTimelineStore } = await import("./store/timelineStore");

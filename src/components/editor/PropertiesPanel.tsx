@@ -6,12 +6,49 @@ import { useProjectStore } from "@/store/projectStore";
 import { useHistoryStore } from "@/store/historyStore";
 import { TransformClipCommand } from "@/core/history/commands/TransformCommand";
 import { calculateClipDimensions, type ClipFitModeExtended } from "@/lib/timelineClip";
-import type { TextClip } from "@/types";
+import { recalculateTextClipBounds } from "@/lib/textClip";
+import type { Clip, TextClip } from "@/types";
 import { usePresetStore } from "@/store/presetStore";
 
 import { EmptyPropertiesState } from "./properties/EmptyPropertiesState";
 import { TextStyleSection } from "./properties/TextStyleSection";
 import { TransformSection } from "./properties/TransformSection";
+
+const TEXT_BOUNDS_STYLE_KEYS: (keyof TextClip)[] = ["text", "fontSize", "fontFamily", "fontWeight", "fontStyle", "styleId", "stroke", "shadow", "background", "letterSpacing", "lineHeight"];
+const MANUAL_BOUNDS_KEYS: (keyof Clip)[] = ["x", "y", "width", "height"];
+
+export function shouldRecalculateTextBoundsForPropertyUpdate(updates: Record<string, unknown>): boolean {
+  const hasManualBounds = MANUAL_BOUNDS_KEYS.some((key) => key in updates);
+  const hasStyleChange = TEXT_BOUNDS_STYLE_KEYS.some((key) => key in updates);
+  return hasStyleChange && !hasManualBounds;
+}
+
+export function buildClipPropertyTransform(
+  clip: Clip,
+  updates: Record<string, unknown>,
+  canvasWidth: number,
+  canvasHeight: number,
+): { oldTransform: Record<string, unknown>; newTransform: Record<string, unknown> } {
+  let newTransform = { ...updates };
+
+  if ("text" in clip && shouldRecalculateTextBoundsForPropertyUpdate(updates)) {
+    const recalculated = recalculateTextClipBounds(clip as TextClip, updates as Partial<TextClip>, canvasWidth, canvasHeight);
+    newTransform = {
+      ...newTransform,
+      x: recalculated.x,
+      y: recalculated.y,
+      width: recalculated.width,
+      height: recalculated.height,
+    };
+  }
+
+  const oldTransform: Record<string, unknown> = {};
+  for (const key of Object.keys(newTransform)) {
+    oldTransform[key] = (clip as unknown as Record<string, unknown>)[key];
+  }
+
+  return { oldTransform, newTransform };
+}
 
 export const PropertiesPanel: React.FC = () => {
   const { selectedClipIds } = useUIStore();
@@ -37,8 +74,7 @@ export const PropertiesPanel: React.FC = () => {
   const textClip = selectedClip as unknown as TextClip;
 
   const handleUpdate = (key: string, value: any) => {
-    const oldTransform: Record<string, any> = { [key]: (selectedClip as any)[key] };
-    const newTransform: Record<string, any> = { [key]: value };
+    const { oldTransform, newTransform } = buildClipPropertyTransform(selectedClip, { [key]: value }, project?.canvasWidth ?? 1920, project?.canvasHeight ?? 1080);
 
     // Clear styleId when user manually customizes styling properties
     // Commented out to support programmatic API style overrides without losing preset association
@@ -54,11 +90,7 @@ export const PropertiesPanel: React.FC = () => {
   };
 
   const handleUpdateMultiple = (fields: Record<string, any>) => {
-    const oldFields: Record<string, any> = {};
-    const newFields = { ...fields };
-    for (const key in fields) {
-      oldFields[key] = (selectedClip as any)[key];
-    }
+    const { oldTransform: oldFields, newTransform: newFields } = buildClipPropertyTransform(selectedClip, fields, project?.canvasWidth ?? 1920, project?.canvasHeight ?? 1080);
 
     // Clear styleId when styling properties are modified in batch, unless styleId is explicitly being set
     // Commented out to support programmatic API style overrides without losing preset association

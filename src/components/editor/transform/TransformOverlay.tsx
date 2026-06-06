@@ -29,6 +29,10 @@ const traceSelect = (...args: unknown[]) => {
 const CENTER_GUIDE_SNAP_PX = 8;
 const CENTER_MAGNET_SNAP_PX = 12;
 
+export function shouldScaleTextFontForHandle(handle: TransformHandle): boolean {
+  return handle === "nw" || handle === "ne" || handle === "sw" || handle === "se";
+}
+
 /**
  * Map cursor string to CSS class for Tauri compatibility.
  * Tauri desktop apps have issues with inline cursor styles, so we use CSS classes instead.
@@ -365,9 +369,10 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth,
         }
       }
 
-      // Automatically scale the text font size proportionally with the height during resizing.
-      // This prevents the text from being clipped or cut off.
-      if (startFontSizeRef.current !== undefined) {
+      // Corner handles scale text proportionally. Side handles reshape the text box
+      // for wrapping and must keep font size stable; otherwise line-count changes
+      // feed back into font scaling and cause visible flicker during resize.
+      if (startFontSizeRef.current !== undefined && shouldScaleTextFontForHandle(activeTransform.handle)) {
         const startHeight = activeTransform.startTransform.height || 1;
         const newHeight = newTransform.height ?? activeTransform.startTransform.height;
         const heightScale = newHeight / startHeight;
@@ -538,11 +543,11 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth,
         }}
       >
         {/* Sleek, professional semi-transparent border, highlighted in red with a glow when snapped to center */}
-        <div 
+        <div
           className="absolute border inset-0 pointer-events-none transition-all duration-75"
           style={{
-            borderColor: (showVerticalCenterGuide || showHorizontalCenterGuide) ? "#ff3b30" : "#ffffff",
-            boxShadow: (showVerticalCenterGuide || showHorizontalCenterGuide) ? "0 0 8px rgba(255, 59, 48, 0.6)" : "0 2px 4px rgba(0, 0, 0, 0.15)",
+            borderColor: showVerticalCenterGuide || showHorizontalCenterGuide ? "#ff3b30" : "#ffffff",
+            boxShadow: showVerticalCenterGuide || showHorizontalCenterGuide ? "0 0 8px rgba(255, 59, 48, 0.6)" : "0 2px 4px rgba(0, 0, 0, 0.15)",
             borderWidth: "1px",
           }}
         />

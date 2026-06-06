@@ -16,6 +16,7 @@ import { AudioWaveform } from "../media-panel/AudioWaveform";
 import { PreviewTransport } from "./PreviewTransport";
 import { createTextClip } from "@/lib/textClip";
 import { TextSourcePreview } from "./TextSourcePreview";
+import { useEffectsStore } from "@/features/text-effects/store/effectsStore";
 
 // GPU preview for scrubbing only (precise frame-accurate seeking)
 // Use HTML5 video for playback (hardware decode, buffering, smooth playback)
@@ -194,6 +195,9 @@ export const SourcePreview: React.FC = () => {
       // This ensures the rasterizer will find the cached definition when rendering the clip.
       const styleId = preset.presetType === "effect" ? preset.id : undefined;
 
+      // Get the effect definition for accurate bounding box calculation
+      const effectDefinition = styleId ? useEffectsStore.getState().definitions[styleId] : undefined;
+
       // Log the full text effect definition to verify caching
       console.log("[SourcePreview] Adding text effect to timeline:", {
         presetType: preset.presetType,
@@ -201,6 +205,7 @@ export const SourcePreview: React.FC = () => {
         presetId: preset.id,
         presetName: preset.name,
         fullPreset: preset,
+        effectDefinition,
       });
 
       // When adding a text effect, we should NOT override individual properties
@@ -225,14 +230,8 @@ export const SourcePreview: React.FC = () => {
         templateId: preset.presetType === "template" ? preset.id : undefined,
         // Only fontSize is needed to calculate the text bounding box
         fontSize: preset.fontSize || (styleId ? 96 : 48),
-      });
-
-      console.log("[SourcePreview] Created text clip:", {
-        clipId: textClip.id,
-        styleId: textClip.styleId,
-        text: textClip.text,
-        fontFamily: textClip.fontFamily,
-        fontSize: textClip.fontSize,
+        // Pass the effect definition for accurate bounding box calculation
+        effectDefinition,
       });
 
       addClip(textClip);

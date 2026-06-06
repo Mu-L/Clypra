@@ -17,13 +17,14 @@
  *   engine.evaluateScene   → reads SceneDocument       → draws pixels
  */
 
-import type { Clip, Track, MediaAsset, Project, TextClip } from "@/types";
+import type { Clip, Track, MediaAsset, Project, TextClip, TransitionTimelineItem } from "@/types";
 import type { EvaluatedScene, EvaluatedVisualLayer, EvaluatedMediaLayer, EvaluatedTextLayer, EvaluatedAudioLayer, EvaluatedTransition, SceneMetadata, BlendMode } from "./types";
 import { toCompositorClips } from "../timeline/adapter";
 import { getClipEndTime } from "@/lib/timelineClip";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getEvaluationCache, computeClipVersion } from "./cache";
 import { evaluateProperty } from "./animation";
+import { resolveClipSourceTime } from "../timeline/sourceTime";
 
 /**
  * Evaluate the NLE timeline at a specific time.
@@ -35,7 +36,7 @@ import { evaluateProperty } from "./animation";
  * @param assets  - All media assets
  * @param project - Project settings
  */
-export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track[], assets: MediaAsset[], project: Project | null): EvaluatedScene {
+export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track[], assets: MediaAsset[], project: Project | null, transitions: TransitionTimelineItem[] = []): EvaluatedScene {
   // Convert to compositor clips (adds roles, priorities)
   const compositorClips = toCompositorClips(clips, tracks);
 
@@ -58,12 +59,15 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
 
   // ─── 1. Active Clip Resolution (Contract §1) ─────────────────────────────
 
+  const transitionWindows = resolveActiveTransitionWindows(transitions, compositorClips, evalTime);
+
   const activeClips = compositorClips.filter((clip) => {
     const clipEnd = getClipEndTime(clip);
     const isInTimeBounds = clip.startTime <= evalTime && evalTime < clipEnd;
     const track = trackMap.get(clip.trackId);
     const isVisible = track?.visible ?? true;
-    return isInTimeBounds && isVisible;
+    const isInTransition = transitionWindows.some((transition) => transition.fromClip.id === clip.id || transition.toClip.id === clip.id);
+    return (isInTimeBounds || isInTransition) && isVisible;
   });
 
   // ─── 2. Compositing Order (Contract §2) ───────────────────────────────────
@@ -99,7 +103,7 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
 
     if (isTextClip) {
       const textClip = clip as unknown as TextClip;
-      const transitionState = evaluateTransitionState(clip, evalTime, sortedClips);
+      const transitionState = evaluateTransitionState(clip, transitionWindows);
 
       const evalFontSize = kf.fontSize !== undefined ? evaluateProperty(kf.fontSize, offset, clip.duration) : textClip.fontSize || 48;
       const evalColor = kf.color !== undefined ? evaluateProperty(kf.color, offset, clip.duration) : textClip.color || "#ffffff";
@@ -149,11 +153,11 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
     const asset = assetMap.get(clip.mediaId);
     if (!asset || (asset.type !== "video" && asset.type !== "image")) continue;
 
-    const sourceTime = clip.trimIn + (evalTime - clip.startTime);
+    const sourceTime = resolveClipSourceTime(clip, evalTime, { clampToRange: true }).sourceTime;
     const sourcePath = asset.path ? convertFileSrc(asset.path) : asset.posterFrame || "";
     if (!sourcePath) continue;
 
-    const transitionState = evaluateTransitionState(clip, evalTime, sortedClips);
+    const transitionState = evaluateTransitionState(clip, transitionWindows);
 
     const mediaLayer: EvaluatedMediaLayer = {
       layerId: `${clip.id}-${evalTime}`,
@@ -192,7 +196,7 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
     if (!hasAudio || !asset) continue;
     if (track?.muted ?? false) continue;
 
-    const sourceTime = clip.trimIn + (evalTime - clip.startTime);
+    const sourceTime = resolveClipSourceTime(clip, evalTime, { clampToRange: true }).sourceTime;
     const sourcePath = asset.path ? convertFileSrc(asset.path) : "";
     if (!sourcePath) continue;
 
@@ -211,8 +215,23 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
 
   audioLayers.sort((a, b) => b.priority - a.priority);
 
-  // ─── 5. Transitions (placeholder) ─────────────────────────────────────────
-  const transitions: EvaluatedTransition[] = [];
+  // ─── 5. Transitions ───────────────────────────────────────────────────────
+  const evaluatedTransitions: EvaluatedTransition[] = transitionWindows
+    .map((transition) => {
+      const outgoingLayer = visualLayers.find((layer) => layer.clipId === transition.fromClip.id);
+      const incomingLayer = visualLayers.find((layer) => layer.clipId === transition.toClip.id);
+      if (!outgoingLayer || !incomingLayer) return null;
+      return {
+        transitionId: transition.transition.id,
+        type: transition.transition.type,
+        progress: transition.progress,
+        duration: transition.transition.placement.duration,
+        outgoingLayer: outgoingLayer.layerId,
+        incomingLayer: incomingLayer.layerId,
+        blendMode: "normal" as BlendMode,
+      };
+    })
+    .filter((transition): transition is EvaluatedTransition => transition !== null);
 
   // ─── 6. Metadata ──────────────────────────────────────────────────────────
 
@@ -232,7 +251,7 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
     activeMediaHash,
   };
 
-  return { visualLayers, audioLayers, transitions, metadata };
+  return { visualLayers, audioLayers, transitions: evaluatedTransitions, metadata };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -249,9 +268,44 @@ function getRoleOrder(role: string): number {
   return order[role] ?? 1;
 }
 
-function evaluateTransitionState(clip: any, time: number, allClips: any[]): { inTransition: boolean; type?: "fade" | "dissolve"; progress?: number; opacity?: number } {
-  // Placeholder — full transition detection tracked in issue #transitions
-  return { inTransition: false, opacity: 1.0 };
+interface ActiveTransitionWindow {
+  transition: TransitionTimelineItem;
+  fromClip: Clip;
+  toClip: Clip;
+  progress: number;
+}
+
+function resolveActiveTransitionWindows(transitions: TransitionTimelineItem[], clips: Clip[], time: number): ActiveTransitionWindow[] {
+  return transitions
+    .map((transition) => {
+      const start = transition.placement.startTime;
+      const duration = transition.placement.duration;
+      const end = start + duration;
+      if (duration <= 0 || time < start || time > end) return null;
+
+      const fromClip = clips.find((clip) => clip.id === transition.fromItemId);
+      const toClip = clips.find((clip) => clip.id === transition.toItemId);
+      if (!fromClip || !toClip) return null;
+
+      const rawProgress = Math.max(0, Math.min(1, (time - start) / duration));
+      const progress = transition.easing === "easeInOut" ? rawProgress * rawProgress * (3 - 2 * rawProgress) : rawProgress;
+      return { transition, fromClip, toClip, progress };
+    })
+    .filter((transition): transition is ActiveTransitionWindow => transition !== null);
+}
+
+function evaluateTransitionState(clip: Clip, transitionWindows: ActiveTransitionWindow[]): { inTransition: boolean; type?: "fade" | "dissolve"; progress?: number; opacity?: number } {
+  const transition = transitionWindows.find((candidate) => candidate.fromClip.id === clip.id || candidate.toClip.id === clip.id);
+  if (!transition) return { inTransition: false, opacity: 1.0 };
+
+  const isOutgoing = transition.fromClip.id === clip.id;
+  const opacity = isOutgoing ? 1 - transition.progress : transition.progress;
+  return {
+    inTransition: true,
+    type: transition.transition.type,
+    progress: transition.progress,
+    opacity,
+  };
 }
 
 // ─── Cached variant ───────────────────────────────────────────────────────────
@@ -260,15 +314,15 @@ function evaluateTransitionState(clip: any, time: number, allClips: any[]): { in
  * Evaluate the NLE timeline with LRU caching and epoch-based invalidation.
  * This is the recommended entry point for all preview/render paths.
  */
-export function evaluateTimelineSceneCached(time: number, clips: Clip[], tracks: Track[], assets: MediaAsset[], project: Project | null, epoch: number = 0): EvaluatedScene {
+export function evaluateTimelineSceneCached(time: number, clips: Clip[], tracks: Track[], assets: MediaAsset[], project: Project | null, epoch: number = 0, transitions: TransitionTimelineItem[] = []): EvaluatedScene {
   const cache = getEvaluationCache();
-  const clipVersion = computeClipVersion(clips);
+  const clipVersion = computeClipVersion(clips, transitions);
   const cacheKey = { time, epoch, clipVersion };
 
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const scene = evaluateTimelineScene(time, clips, tracks, assets, project);
+  const scene = evaluateTimelineScene(time, clips, tracks, assets, project, transitions);
   cache.set(cacheKey, scene);
   return scene;
 }

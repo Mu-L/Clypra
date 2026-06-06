@@ -15,7 +15,7 @@
  */
 
 import type { FrameRequest, FrameResult, RenderResourceHandle } from "../resources/types";
-import type { Clip, Track, MediaAsset, Project } from "@/types";
+import type { Clip, Track, MediaAsset, Project, TransitionTimelineItem } from "@/types";
 import { evaluateTimelineSceneCached } from "../evaluation/evaluator";
 import { rasterizeScene } from "../render/rasterizer";
 import { getResourceCache } from "../resources/ResourceCache";
@@ -124,6 +124,7 @@ export class FrameScheduler {
   private clips: Clip[] = [];
   private tracks: Track[] = [];
   private assets: MediaAsset[] = [];
+  private transitions: TransitionTimelineItem[] = [];
   private project: Project | null = null;
   private epoch: number = 0;
 
@@ -152,10 +153,11 @@ export class FrameScheduler {
    * Update timeline state.
    * Must be called before scheduling frames.
    */
-  updateTimeline(clips: Clip[], tracks: Track[], assets: MediaAsset[], project: Project | null, epoch: number): void {
+  updateTimeline(clips: Clip[], tracks: Track[], assets: MediaAsset[], project: Project | null, epoch: number, transitions: TransitionTimelineItem[] = []): void {
     this.clips = clips;
     this.tracks = tracks;
     this.assets = assets;
+    this.transitions = transitions;
     this.project = project;
     this.epoch = epoch;
   }
@@ -403,7 +405,7 @@ export class FrameScheduler {
       job.progress = 0.3;
       const evalStartTime = Date.now();
 
-      const scene = evaluateTimelineSceneCached(job.request.time, this.clips, this.tracks, this.assets, this.project, this.epoch);
+      const scene = evaluateTimelineSceneCached(job.request.time, this.clips, this.tracks, this.assets, this.project, this.epoch, this.transitions);
 
       job.metrics.evaluationTimeMs = Date.now() - evalStartTime;
       this.stats.totalEvaluationTimeMs += job.metrics.evaluationTimeMs;
@@ -548,7 +550,7 @@ export class FrameScheduler {
    */
   private async preloadResources(job: FrameJob): Promise<void> {
     // Evaluate scene to discover required resources
-    const scene = evaluateTimelineSceneCached(job.request.time, this.clips, this.tracks, this.assets, this.project, this.epoch);
+    const scene = evaluateTimelineSceneCached(job.request.time, this.clips, this.tracks, this.assets, this.project, this.epoch, this.transitions);
 
     const resourceCache = getResourceCache();
     const loadPromises: Promise<void>[] = [];
@@ -634,7 +636,7 @@ export class FrameScheduler {
    */
   private async preloadFonts(job: FrameJob): Promise<void> {
     // Evaluate scene to discover required fonts
-    const scene = evaluateTimelineSceneCached(job.request.time, this.clips, this.tracks, this.assets, this.project, this.epoch);
+    const scene = evaluateTimelineSceneCached(job.request.time, this.clips, this.tracks, this.assets, this.project, this.epoch, this.transitions);
 
     const fontLoader = getFontLoader();
     const fontDescriptors = [];

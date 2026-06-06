@@ -73,7 +73,7 @@ describe("evaluateScene (canonical evaluator)", () => {
     // Should be sorted by track index (inverted: higher index renders below)
     // t2 (index 1) renders below t1 (index 0), so t1 appears on top
     expect(scene.visualLayers).toHaveLength(2);
-    expect(scene.visualLayers[0].clipId).toBe("c1"); // t2 (index 1) - background
-    expect(scene.visualLayers[1].clipId).toBe("c2"); // t1 (index 0) - foreground (top track)
+    expect(scene.visualLayers[0].clipId).toBe("c2"); // t1 (index 0) - foreground (top track)
+    expect(scene.visualLayers[1].clipId).toBe("c1"); // t2 (index 1) - background
   });
 });

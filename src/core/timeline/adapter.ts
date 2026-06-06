@@ -19,11 +19,11 @@ import type { CompositorClip, ClipRole } from "../compositor/types";
 export function toCompositorClip(clip: Clip, tracks: Track[]): CompositorClip {
   const track = tracks.find((t) => t.id === clip.trackId);
 
-  // Infer role from track type
-  const role = inferRoleFromTrack(track);
-
   // Get track index (for compositing order)
   const trackIndex = tracks.findIndex((t) => t.id === clip.trackId);
+
+  // Use explicit clip role when available, otherwise infer from track position.
+  const role = ((clip as any).role as ClipRole | undefined) ?? inferRoleFromTrackPosition(track, trackIndex, tracks);
 
   // Default z-index and priority
   // TODO: These should eventually come from clip metadata

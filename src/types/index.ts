@@ -72,6 +72,8 @@ export interface Project {
   frameRate: 24 | 30 | 60;
   duration: number;
   mediaAssets?: MediaAsset[];
+  /** Timeline schema version for forward-compatible project migrations. */
+  timelineSchemaVersion?: number;
 }
 
 export type TrackType = "video" | "audio" | "text";
@@ -161,6 +163,84 @@ export interface TextClip extends Clip {
   };
   styleDefinition?: import("@clypra/engine").TextEffectDefinition;
 }
+
+export type TimelineItemKind = "video" | "audio" | "image" | "text" | "transition";
+export type TimelineItemRole = "primary" | "overlay" | "text" | "effect" | "background" | "audio";
+
+export interface TimelinePlacement {
+  trackId: string;
+  startTime: number;
+  duration: number;
+  role: TimelineItemRole;
+  zIndex: number;
+}
+
+export interface TimelineSourceRange {
+  mediaId: string;
+  trimIn: number;
+  trimOut: number;
+  playbackRate: number;
+  reverse: boolean;
+}
+
+export interface TimelineTransform {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  opacity: number;
+  rotation: number;
+  aspectRatioLocked?: boolean;
+  sourceAspectRatio?: number;
+  fitMode?: Clip["fitMode"];
+}
+
+export interface TimelineAudioProperties {
+  volume: number;
+  pan: number;
+  muted: boolean;
+}
+
+export interface TimelineEffectStack {
+  effects: unknown[];
+  version: number;
+}
+
+export interface BaseTimelineItem {
+  id: string;
+  kind: TimelineItemKind;
+  placement: TimelinePlacement;
+  effects: TimelineEffectStack;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MediaTimelineItem extends BaseTimelineItem {
+  kind: "video" | "audio" | "image";
+  source: TimelineSourceRange;
+  transform: TimelineTransform;
+  audio?: TimelineAudioProperties;
+}
+
+export interface TextTimelineItem extends BaseTimelineItem {
+  kind: "text";
+  transform: TimelineTransform;
+  text: Omit<TextClip, keyof Clip>;
+}
+
+export type TransitionType = "fade" | "dissolve";
+export type TransitionAlignment = "center" | "start" | "end";
+export type TransitionEasing = "linear" | "easeInOut";
+
+export interface TransitionTimelineItem extends BaseTimelineItem {
+  kind: "transition";
+  type: TransitionType;
+  fromItemId: string;
+  toItemId: string;
+  alignment: TransitionAlignment;
+  easing: TransitionEasing;
+}
+
+export type TimelineItem = MediaTimelineItem | TextTimelineItem | TransitionTimelineItem;
 
 export type DragItem = { type: "MEDIA_ASSET"; asset: MediaAsset } | { type: "CLIP"; clip: Clip };
 

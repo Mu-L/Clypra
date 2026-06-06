@@ -30,11 +30,13 @@ export const TextStyleSection: React.FC<TextStyleSectionProps> = ({ textClip, pr
       fontStyle: effect.font.style,
       stroke: effect.strokes?.[0] ? { color: effect.strokes[0].color, width: effect.strokes[0].width } : undefined,
       shadow: effect.shadows?.[0] ? { color: effect.shadows[0].color, blur: effect.shadows[0].blur, offsetX: effect.shadows[0].offsetX ?? 0, offsetY: effect.shadows[0].offsetY ?? 0 } : undefined,
-      background: effect.panel ? {
-        color: effect.panel.color || "rgba(0,0,0,0.6)",
-        padding: effect.panel.paddingX !== undefined ? effect.panel.paddingX : 12,
-        borderRadius: effect.panel.radius !== undefined ? effect.panel.radius : 6
-      } : undefined,
+      background: effect.panel
+        ? {
+            color: effect.panel.color || "rgba(0,0,0,0.6)",
+            padding: effect.panel.paddingX !== undefined ? effect.panel.paddingX : 12,
+            borderRadius: effect.panel.radius !== undefined ? effect.panel.radius : 6,
+          }
+        : undefined,
     });
   };
 
@@ -289,26 +291,14 @@ export const TextStyleSection: React.FC<TextStyleSectionProps> = ({ textClip, pr
                 { label: "Gold", value: "#ffe066, #b38600" },
                 { label: "Sunset", value: "#ff3e00, #ff0077, #aa00ff" },
                 { label: "Ocean", value: "#00c8ff, #00ff66" },
-                { label: "Rainbow", value: "#ff007f, #aa00ff, #00c8ff, #00ff66" }
+                { label: "Rainbow", value: "#ff007f, #aa00ff, #00c8ff, #00ff66" },
               ].map((p, idx) => {
                 const isGrad = p.value.includes(",");
-                const style: React.CSSProperties = isGrad 
-                  ? { background: `linear-gradient(135deg, ${p.value})` }
-                  : { backgroundColor: p.value };
-                
+                const style: React.CSSProperties = isGrad ? { background: `linear-gradient(135deg, ${p.value})` } : { backgroundColor: p.value };
+
                 const isSelected = textClip.color === p.value;
 
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => handleUpdate("color", p.value)}
-                    className={`w-6 h-6 rounded-full border cursor-pointer hover:scale-110 active:scale-95 transition-all focus:outline-none ${
-                      isSelected ? "border-accent ring-2 ring-accent/30 scale-105" : "border-border/60 hover:border-text-primary"
-                    }`}
-                    style={style}
-                    title={p.label}
-                  />
-                );
+                return <button key={idx} onClick={() => handleUpdate("color", p.value)} className={`w-6 h-6 rounded-full border cursor-pointer hover:scale-110 active:scale-95 transition-all focus:outline-none ${isSelected ? "border-accent ring-2 ring-accent/30 scale-105" : "border-border/60 hover:border-text-primary"}`} style={style} title={p.label} />;
               })}
             </div>
           </div>
@@ -324,7 +314,7 @@ export const TextStyleSection: React.FC<TextStyleSectionProps> = ({ textClip, pr
                   if (e.target.checked) {
                     handleUpdate("stroke", { color: "#000000", width: 4 });
                   } else {
-                    handleUpdate("stroke", undefined);
+                    handleUpdate("stroke", null); // Explicitly disable stroke
                   }
                 }}
                 className="rounded border-border accent-accent cursor-pointer"
@@ -339,12 +329,7 @@ export const TextStyleSection: React.FC<TextStyleSectionProps> = ({ textClip, pr
                     {/* Quick Stroke Colors */}
                     <div className="flex gap-1">
                       {["#000000", "#ffffff", "#ff3b30", "#ffcc00"].map((c, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => handleUpdate("stroke", { ...textClip.stroke, color: c })}
-                          className={`w-4 h-4 rounded-full border border-border/60 cursor-pointer ${textClip.stroke?.color === c ? "ring-2 ring-accent/40" : ""}`}
-                          style={{ backgroundColor: c }}
-                        />
+                        <button key={idx} onClick={() => handleUpdate("stroke", { ...textClip.stroke, color: c })} className={`w-4 h-4 rounded-full border border-border/60 cursor-pointer ${textClip.stroke?.color === c ? "ring-2 ring-accent/40" : ""}`} style={{ backgroundColor: c }} />
                       ))}
                     </div>
                     <input type="color" value={textClip.stroke.color} onChange={(e) => handleUpdate("stroke", { ...textClip.stroke, color: e.target.value })} className="w-5 h-5 bg-transparent border-0 cursor-pointer" />
@@ -372,7 +357,7 @@ export const TextStyleSection: React.FC<TextStyleSectionProps> = ({ textClip, pr
                   if (e.target.checked) {
                     handleUpdate("shadow", { color: "#ff0000", blur: 15, offsetX: 0, offsetY: 0 });
                   } else {
-                    handleUpdate("shadow", undefined);
+                    handleUpdate("shadow", null); // Explicitly disable shadow
                   }
                 }}
                 className="rounded border-border accent-accent cursor-pointer"
@@ -387,12 +372,7 @@ export const TextStyleSection: React.FC<TextStyleSectionProps> = ({ textClip, pr
                     {/* Quick Glow Colors */}
                     <div className="flex gap-1">
                       {["#ff0000", "#ff007f", "#00f0ff", "#ffe066"].map((c, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => handleUpdate("shadow", { ...textClip.shadow, color: c })}
-                          className={`w-4 h-4 rounded-full border border-border/60 cursor-pointer ${textClip.shadow?.color === c ? "ring-2 ring-accent/40" : ""}`}
-                          style={{ backgroundColor: c }}
-                        />
+                        <button key={idx} onClick={() => handleUpdate("shadow", { ...textClip.shadow, color: c })} className={`w-4 h-4 rounded-full border border-border/60 cursor-pointer ${textClip.shadow?.color === c ? "ring-2 ring-accent/40" : ""}`} style={{ backgroundColor: c }} />
                       ))}
                     </div>
                     <input type="color" value={textClip.shadow.color} onChange={(e) => handleUpdate("shadow", { ...textClip.shadow, color: e.target.value })} className="w-5 h-5 bg-transparent border-0 cursor-pointer" />
@@ -432,7 +412,7 @@ export const TextStyleSection: React.FC<TextStyleSectionProps> = ({ textClip, pr
                   if (e.target.checked) {
                     handleUpdate("background", { color: "rgba(0,0,0,0.6)", padding: 12, borderRadius: 6 });
                   } else {
-                    handleUpdate("background", undefined);
+                    handleUpdate("background", null); // Explicitly disable background
                   }
                 }}
                 className="rounded border-border accent-accent cursor-pointer"
@@ -447,12 +427,7 @@ export const TextStyleSection: React.FC<TextStyleSectionProps> = ({ textClip, pr
                     {/* Quick Background Presets */}
                     <div className="flex gap-1">
                       {["rgba(0,0,0,0.6)", "rgba(255,255,255,0.2)", "rgba(0,122,255,0.3)", "rgba(255,59,48,0.3)"].map((c, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => handleUpdate("background", { ...textClip.background, color: c })}
-                          className={`w-4 h-4 rounded-full border border-border/60 cursor-pointer ${textClip.background?.color === c ? "ring-2 ring-accent/40" : ""}`}
-                          style={{ backgroundColor: c }}
-                        />
+                        <button key={idx} onClick={() => handleUpdate("background", { ...textClip.background, color: c })} className={`w-4 h-4 rounded-full border border-border/60 cursor-pointer ${textClip.background?.color === c ? "ring-2 ring-accent/40" : ""}`} style={{ backgroundColor: c }} />
                       ))}
                     </div>
                     <input type="color" value={textClip.background.color.startsWith("rgba") ? "#000000" : textClip.background.color} onChange={(e) => handleUpdate("background", { ...textClip.background, color: e.target.value })} className="w-5 h-5 bg-transparent border-0 cursor-pointer" />

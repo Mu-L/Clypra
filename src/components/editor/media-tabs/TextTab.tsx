@@ -376,11 +376,13 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
             fontStyle: targetEffect.font?.style,
             stroke: targetEffect.strokes?.[0] ? { color: targetEffect.strokes[0].color, width: targetEffect.strokes[0].width } : undefined,
             shadow: targetEffect.shadows?.[0] ? { color: targetEffect.shadows[0].color, blur: targetEffect.shadows[0].blur, offsetX: targetEffect.shadows[0].offsetX ?? 0, offsetY: targetEffect.shadows[0].offsetY ?? 0 } : undefined,
-            background: targetEffect.panel ? {
-              color: targetEffect.panel.color || "rgba(0,0,0,0.6)",
-              padding: targetEffect.panel.paddingX !== undefined ? targetEffect.panel.paddingX : 12,
-              borderRadius: targetEffect.panel.radius !== undefined ? targetEffect.panel.radius : 6
-            } : undefined,
+            background: targetEffect.panel
+              ? {
+                  color: targetEffect.panel.color || "rgba(0,0,0,0.6)",
+                  padding: targetEffect.panel.paddingX !== undefined ? targetEffect.panel.paddingX : 12,
+                  borderRadius: targetEffect.panel.radius !== undefined ? targetEffect.panel.radius : 6,
+                }
+              : undefined,
           },
           "text",
         );
@@ -428,11 +430,13 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
         fontStyle: effect.font?.style,
         stroke: effect.strokes?.[0] ? { color: effect.strokes[0].color, width: effect.strokes[0].width } : undefined,
         shadow: effect.shadows?.[0] ? { color: effect.shadows[0].color, blur: effect.shadows[0].blur, offsetX: effect.shadows[0].offsetX ?? 0, offsetY: effect.shadows[0].offsetY ?? 0 } : undefined,
-        background: effect.panel ? {
-          color: effect.panel.color || "rgba(0,0,0,0.6)",
-          padding: effect.panel.paddingX !== undefined ? effect.panel.paddingX : 12,
-          borderRadius: effect.panel.radius !== undefined ? effect.panel.radius : 6
-        } : undefined,
+        background: effect.panel
+          ? {
+              color: effect.panel.color || "rgba(0,0,0,0.6)",
+              padding: effect.panel.paddingX !== undefined ? effect.panel.paddingX : 12,
+              borderRadius: effect.panel.radius !== undefined ? effect.panel.radius : 6,
+            }
+          : undefined,
       },
       "text",
     );
@@ -458,7 +462,7 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-surface/5 select-none">
       {/* ── Top Header Control Navigation Row (Overflows X) ────────────── */}
       <div className="flex items-center gap-2.5 p-1 border-b border-border/50 shrink-0 bg-surface/10">
-        <Button variant="ghost" size="sm" className="shrink-0 flex items-center justify-center gap-1 h-min px-2 py-0.5 cursor-pointer bg-accent/10 rounded-sm transition-all text-[12px] text-accent-soft hover:bg-accent/20 border border-accent/20" onClick={() => onAddToTimeline?.({ name: "Custom Text" }, "text")}>
+        <Button variant="ghost" size="sm" className="shrink-0 flex items-center justify-center gap-1 h-min px-2 py-0.5 cursor-pointer bg-accent/10 rounded-sm transition-all text-[12px] text-accent-soft hover:bg-accent/20 border border-accent/20" onClick={() => onAddToTimeline?.({ name: "Custom Text", styleId: "premium-sticker" }, "text")}>
           Add Text
         </Button>
 

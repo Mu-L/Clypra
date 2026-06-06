@@ -15,7 +15,7 @@
  * - Easy to maintain when schema changes
  */
 
-import type { Project, MediaAsset, Track, Clip, AspectRatio } from "./index";
+import type { Project, MediaAsset, Track, Clip, AspectRatio, TransitionTimelineItem } from "./index";
 
 // ============================================================================
 // RUST TYPES (snake_case)
@@ -41,6 +41,8 @@ export interface RustProject {
   media_assets?: RustMediaAsset[];
   tracks?: RustTrack[];
   clips?: RustClip[];
+  transitions?: TransitionTimelineItem[];
+  timeline_schema_version?: number | null;
 }
 
 /**
@@ -120,6 +122,7 @@ export function fromRustProject(rust: RustProject): Project {
     frameRate: (rust.frame_rate ?? 30) as 24 | 30 | 60,
     duration: rust.duration ?? 0,
     mediaAssets: rust.media_assets?.map(fromRustMediaAsset),
+    timelineSchemaVersion: rust.timeline_schema_version ?? 1,
   };
 }
 
@@ -215,6 +218,7 @@ export function toRustProject(
     tracks?: Track[];
     clips?: Clip[];
     mediaAssets?: MediaAsset[];
+    transitions?: TransitionTimelineItem[];
   },
 ): RustProject {
   return {
@@ -230,6 +234,8 @@ export function toRustProject(
     media_assets: options?.mediaAssets?.map(toRustMediaAsset) ?? [],
     tracks: options?.tracks?.map(toRustTrack) ?? [],
     clips: options?.clips?.map(toRustClip) ?? [],
+    transitions: options?.transitions ?? [],
+    timeline_schema_version: frontend.timelineSchemaVersion ?? 1,
   };
 }
 

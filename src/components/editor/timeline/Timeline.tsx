@@ -152,7 +152,6 @@ export const Timeline: React.FC = () => {
       commitTransaction();
 
       withBatch(() => {
-        affectedTracks.forEach((trackId) => normalizeTrack(trackId));
         removeEmptyNonMainTracks(Array.from(affectedTracks));
       });
 

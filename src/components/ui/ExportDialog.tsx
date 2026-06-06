@@ -166,7 +166,7 @@ const countGraphemes = (str: string): number => {
 
 export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) => {
   const { project, mediaAssets, renameProject } = useProjectStore();
-  const { clips, tracks, epoch, getTimelineEndTime } = useTimelineStore();
+  const { clips, tracks, transitions, epoch, getTimelineEndTime } = useTimelineStore();
 
   // State
   const [preset, setPreset] = useState<ExportPreset>("1080p-fast");
@@ -317,9 +317,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
       const { exportVideo } = await exportVideoModule();
 
       const exportResult = await exportVideo({
-        clips,
-        tracks,
-        assets: mediaAssets,
+	        clips,
+	        tracks,
+	        transitions,
+	        assets: mediaAssets,
         project,
         epoch,
         startTime: 0,

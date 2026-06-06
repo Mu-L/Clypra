@@ -21,6 +21,7 @@ import { defaultConfig as engineDefaultConfig, evaluateScene as engineEvaluateSc
 import { useEffectsStore } from "../../features/text-effects/store/effectsStore";
 import { invalidateEvaluationCache } from "../evaluation/evaluator";
 import { useTimelineStore } from "../../store/timelineStore";
+import { effectBleed } from "../../lib/textClip";
 
 /**
  * Raster target configuration.
@@ -334,97 +335,43 @@ function drawLoadingPlaceholder(ctx: CanvasRenderingContext2D | OffscreenCanvasR
 function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, layer: EvaluatedTextLayer, width: number, height: number, scaleX: number, scaleY: number): void {
   // fontSize for rendering: scaled to match the layer's on-canvas pixel size.
   const fontSize = layer.fontSize * scaleY;
-  const effectPadding = fontSize * 0.5;
-  const offW = Math.max(1, Math.ceil(width + effectPadding * 2));
-  const offH = Math.max(1, Math.ceil(height + effectPadding * 2));
+  const effectDef = layer.styleId ? useEffectsStore.getState().definitions[layer.styleId] : undefined;
+  const declaredBleed = effectBleed({
+    styleId: layer.styleId,
+    effectDefinition: effectDef,
+    stroke: layer.stroke,
+    shadow: layer.shadow
+      ? {
+          blur: layer.shadow.blur,
+          offsetX: layer.shadow.offsetX,
+          offsetY: layer.shadow.offsetY,
+        }
+      : undefined,
+    background: layer.background,
+  });
+  const effectPaddingX = Math.max(fontSize * 0.25, declaredBleed.x * scaleX);
+  const effectPaddingY = Math.max(fontSize * 0.25, declaredBleed.y * scaleY);
+  const offW = Math.max(1, Math.ceil(width + effectPaddingX * 2));
+  const offH = Math.max(1, Math.ceil(height + effectPaddingY * 2));
 
   let engineConfig: TextEffectConfig;
 
   if (layer.styleId) {
-    const effectDef = useEffectsStore.getState().definitions[layer.styleId];
     if (effectDef) {
-      const authoredFontSize = layer.fontSize;
-      const builder = TextEffectBuilder.fromDefinition(effectDef, layer.text, authoredFontSize, offW, offH);
-
-      const builtCfg = builder.buildConfig();
-      if (layer.time !== undefined) (builtCfg as any).time = layer.time;
-      if (layer.clipStartTime !== undefined) (builtCfg as any).clipStartTime = layer.clipStartTime;
-      if (layer.clipDuration !== undefined) (builtCfg as any).clipDuration = layer.clipDuration;
-
-      // Merge manual styling overrides from the NLE layer properties
-      if (layer.color) {
-        if (layer.color.includes(",")) {
-          const stops = layer.color.split(",").map((c, idx, arr) => ({
-            color: c.trim(),
-            offset: Math.round((idx / (arr.length - 1)) * 100),
-          }));
-          builder.setFillGradient(90, stops);
-        } else {
-          builder.setFillColor(layer.color);
-        }
-      }
-
-      builder.setFont({
-        family: layer.fontFamily || effectDef.font?.family,
-        size: fontSize, // Use render-resolution size
-        weight: typeof layer.fontWeight === "number" ? layer.fontWeight : layer.fontWeight === "bold" ? 700 : 400,
-        style: layer.fontStyle || "normal",
-        letterSpacing: layer.letterSpacing ?? 0,
-        lineHeight: layer.lineHeight ?? 1.2,
-      });
+      // Pass render-resolution fontSize so all derived effect parameters
+      // (stroke width, glow blur, bevel depth, etc.) are computed at the
+      // correct scale for the target framebuffer.
+      const builder = TextEffectBuilder.fromDefinition(effectDef, layer.text, fontSize, offW, offH);
 
       builder.setCanvas({
         posX: layer.textAlign || "center",
         posY: layer.verticalAlign === "middle" ? "middle" : layer.verticalAlign || "middle",
       });
 
-      // Override stroke if user explicitly configured it or disabled it
-      if (layer.stroke !== undefined) {
-        if (layer.stroke) {
-          builder.setStroke({
-            enabled: true,
-            color: layer.stroke.color,
-            width: layer.stroke.width * scaleY,
-          });
-        } else {
-          builder.setStroke({ enabled: false });
-        }
-      }
-      // If layer.stroke is undefined, don't override - let effect definition control it
-
-      // Override shadow if user explicitly configured it or disabled it
-      if (layer.shadow !== undefined) {
-        if (layer.shadow) {
-          builder.setShadow({
-            enabled: true,
-            color: layer.shadow.color,
-            blur: layer.shadow.blur * scaleY,
-            offsetX: layer.shadow.offsetX * scaleX,
-            offsetY: layer.shadow.offsetY * scaleY,
-          });
-        } else {
-          builder.setShadow({ enabled: false });
-        }
-      }
-      // If layer.shadow is undefined, don't override - let effect definition control it
-
-      // Override background panel if user explicitly configured it or disabled it
-      if (layer.background !== undefined) {
-        if (layer.background) {
-          builder.setPanel({
-            enabled: true,
-            color: layer.background.color,
-            radius: layer.background.borderRadius * scaleY,
-            paddingX: layer.background.padding * scaleX,
-            paddingY: layer.background.padding * scaleY,
-          });
-        } else {
-          builder.setPanel({ enabled: false });
-        }
-      }
-      // If layer.background is undefined, don't override - let effect definition control it
-
       engineConfig = builder.buildConfig();
+      if (layer.time !== undefined) (engineConfig as any).time = layer.time;
+      if (layer.clipStartTime !== undefined) (engineConfig as any).clipStartTime = layer.clipStartTime;
+      if (layer.clipDuration !== undefined) (engineConfig as any).clipDuration = layer.clipDuration;
     } else {
       // styleId present but definition not yet in cache — trigger fetch in background
       // and fall back to plain text until it resolves and redraws.
@@ -469,6 +416,7 @@ function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRende
         canvasHeight: offH,
         fontSize,
         fontFamily: layer.fontFamily,
+        letterSpacing: (layer.letterSpacing ?? plainConfig.letterSpacing ?? 0) * scaleX,
         strokeWidth: layer.stroke ? layer.stroke.width * scaleY : plainConfig.strokeWidth * scaleY,
         shadowBlur: layer.shadow ? layer.shadow.blur * scaleY : plainConfig.shadowBlur * scaleY,
         shadowOffsetX: layer.shadow ? layer.shadow.offsetX * scaleX : plainConfig.shadowOffsetX * scaleX,
@@ -487,6 +435,7 @@ function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRende
       canvasHeight: offH,
       fontSize,
       fontFamily: layer.fontFamily,
+      letterSpacing: (layer.letterSpacing ?? plainConfig.letterSpacing ?? 0) * scaleX,
       strokeWidth: layer.stroke ? layer.stroke.width * scaleY : plainConfig.strokeWidth * scaleY,
       shadowBlur: layer.shadow ? layer.shadow.blur * scaleY : plainConfig.shadowBlur * scaleY,
       shadowOffsetX: layer.shadow ? layer.shadow.offsetX * scaleX : plainConfig.shadowOffsetX * scaleX,
@@ -508,7 +457,7 @@ function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRende
     }
     offCtx.clearRect(0, 0, offW, offH);
     engineEvaluateScene(sceneDoc, layer.time ?? 0, offCtx as unknown as CanvasRenderingContext2D);
-    ctx.drawImage(offscreen, 0, 0, offW, offH, -width / 2 - effectPadding, -height / 2 - effectPadding, offW, offH);
+    ctx.drawImage(offscreen, 0, 0, offW, offH, -width / 2 - effectPaddingX, -height / 2 - effectPaddingY, offW, offH);
   }
   CanvasDevice.release(offscreen);
 }
