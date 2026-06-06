@@ -507,8 +507,6 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ canvasWidth,
         {/* Side handles (horizontal & vertical pills) */}
         <Handle position="w" onMouseDown={(e) => handleMouseDown(e, "w")} left={0} top={0} width={handleDisplayWidth} height={handleDisplayHeight} rotation={rotation} />
         <Handle position="e" onMouseDown={(e) => handleMouseDown(e, "e")} left={0} top={0} width={handleDisplayWidth} height={handleDisplayHeight} rotation={rotation} />
-        <Handle position="n" onMouseDown={(e) => handleMouseDown(e, "n")} left={0} top={0} width={handleDisplayWidth} height={handleDisplayHeight} rotation={rotation} />
-        <Handle position="s" onMouseDown={(e) => handleMouseDown(e, "s")} left={0} top={0} width={handleDisplayWidth} height={handleDisplayHeight} rotation={rotation} />
 
         {/* Rotation handle - floating centered below the bottom edge with scale compensation */}
         <Handle position="rotate" onMouseDown={(e) => handleMouseDown(e, "rotate")} scale={scale} left={0} top={0} width={handleDisplayWidth} height={handleDisplayHeight} rotation={rotation} />
