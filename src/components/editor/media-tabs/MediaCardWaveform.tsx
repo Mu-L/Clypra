@@ -13,6 +13,7 @@ export const MediaCardWaveform: React.FC<MediaCardWaveformProps> = ({ audioPath,
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [themeRevision, setThemeRevision] = useState(0);
 
   // Watch for theme changes on document element and trigger redraw
@@ -34,6 +35,7 @@ export const MediaCardWaveform: React.FC<MediaCardWaveformProps> = ({ audioPath,
     const generateWaveform = async () => {
       try {
         setIsLoading(true);
+        setHasError(false);
 
         // Create audio context
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -41,6 +43,10 @@ export const MediaCardWaveform: React.FC<MediaCardWaveformProps> = ({ audioPath,
 
         // Fetch and decode audio
         const response = await fetch(audioPath);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch audio: ${response.status}`);
+        }
+
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
@@ -81,10 +87,17 @@ export const MediaCardWaveform: React.FC<MediaCardWaveformProps> = ({ audioPath,
         audioContext.close();
       } catch (error) {
         console.error("[MediaCardWaveform] Failed to generate waveform:", error);
-        // Generate fallback waveform
+        // Generate fallback waveform pattern for unsupported formats
         if (!isCancelled) {
-          const fallback = Array.from({ length: 100 }, (_, i) => Math.sin(i * 0.3) * 0.5 + 0.5);
+          const fallback = Array.from({ length: 100 }, (_, i) => {
+            // Create a more natural looking waveform pattern
+            const baseWave = Math.sin(i * 0.15) * 0.4;
+            const variation = Math.sin(i * 0.4) * 0.2;
+            const noise = (Math.random() - 0.5) * 0.1;
+            return Math.abs(baseWave + variation + noise) + 0.2;
+          });
           setWaveformData(fallback);
+          setHasError(true);
           setIsLoading(false);
         }
       }
@@ -151,6 +164,13 @@ export const MediaCardWaveform: React.FC<MediaCardWaveformProps> = ({ audioPath,
               <div key={i} className="w-1 h-8 bg-cyan-400/30 rounded-full animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Error indicator (subtle, shown only on hover) */}
+      {hasError && !isLoading && (
+        <div className="absolute bottom-1 right-1 bg-orange-500/80 px-1 py-0.5 rounded text-[8px] text-white opacity-0 group-hover:opacity-100 transition-opacity" title="Preview waveform (format may have limited support)">
+          Preview
         </div>
       )}
     </div>
