@@ -129,6 +129,8 @@ export interface Clip {
   sourceAspectRatio?: number; // Original aspect ratio (width/height)
   /** Placement fit mode used for deterministic reset/re-fit behavior. */
   fitMode?: "contain" | "cover" | "fill" | "stretch" | "original";
+  /** Audio volume (0.0 to 1.0, default 1.0) */
+  volume?: number;
 }
 
 /** Word-level timestamp for karaoke-style caption highlighting */

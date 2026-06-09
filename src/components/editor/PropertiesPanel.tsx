@@ -13,6 +13,7 @@ import { usePresetStore } from "@/store/presetStore";
 import { EmptyPropertiesState } from "./properties/EmptyPropertiesState";
 import { TextStyleSection } from "./properties/TextStyleSection";
 import { TransformSection } from "./properties/TransformSection";
+import { AudioSection } from "./properties/AudioSection";
 
 const TEXT_BOUNDS_STYLE_KEYS: (keyof TextClip)[] = ["text", "fontSize", "fontFamily", "fontWeight", "fontStyle", "styleId", "stroke", "shadow", "background", "letterSpacing", "lineHeight"];
 const MANUAL_BOUNDS_KEYS: (keyof Clip)[] = ["x", "y", "width", "height"];
@@ -23,12 +24,7 @@ export function shouldRecalculateTextBoundsForPropertyUpdate(updates: Record<str
   return hasStyleChange && !hasManualBounds;
 }
 
-export function buildClipPropertyTransform(
-  clip: Clip,
-  updates: Record<string, unknown>,
-  canvasWidth: number,
-  canvasHeight: number,
-): { oldTransform: Record<string, unknown>; newTransform: Record<string, unknown> } {
+export function buildClipPropertyTransform(clip: Clip, updates: Record<string, unknown>, canvasWidth: number, canvasHeight: number): { oldTransform: Record<string, unknown>; newTransform: Record<string, unknown> } {
   let newTransform = { ...updates };
 
   if ("text" in clip && shouldRecalculateTextBoundsForPropertyUpdate(updates)) {
@@ -64,6 +60,7 @@ export const PropertiesPanel: React.FC = () => {
   const selectedClip = clips.find((c) => c.id === selectedClipId);
   const selectedAsset = mediaAssets.find((a) => a.id === selectedClip?.mediaId);
   const isVisualClip = selectedAsset?.type === "video" || selectedAsset?.type === "image";
+  const isAudioClip = selectedAsset?.type === "audio";
   const isTextClip = selectedClip && "text" in selectedClip;
 
   if (!selectedClipId || !selectedClip) {
@@ -155,27 +152,13 @@ export const PropertiesPanel: React.FC = () => {
       <div className="panel-head flex items-center justify-between border-b border-border select-none">
         {isTextClip ? (
           <div className="flex w-full">
-            <button
-              onClick={() => setActivePropertyTab("text")}
-              className={`flex-1 py-3 text-xs font-semibold tracking-wide border-b-2 text-center transition-all cursor-pointer ${
-                activePropertyTab === "text"
-                  ? "text-accent border-accent bg-accent/5"
-                  : "text-text-muted border-transparent hover:text-text-primary"
-              }`}
-            >
+            <button onClick={() => setActivePropertyTab("text")} className={`flex-1 py-3 text-xs font-semibold tracking-wide border-b-2 text-center transition-all cursor-pointer ${activePropertyTab === "text" ? "text-accent border-accent bg-accent/5" : "text-text-muted border-transparent hover:text-text-primary"}`}>
               <span className="flex items-center justify-center gap-1.5">
                 <Type className="w-3.5 h-3.5" />
                 Text Style
               </span>
             </button>
-            <button
-              onClick={() => setActivePropertyTab("transform")}
-              className={`flex-1 py-3 text-xs font-semibold tracking-wide border-b-2 text-center transition-all cursor-pointer ${
-                activePropertyTab === "transform"
-                  ? "text-accent border-accent bg-accent/5"
-                  : "text-text-muted border-transparent hover:text-text-primary"
-              }`}
-            >
+            <button onClick={() => setActivePropertyTab("transform")} className={`flex-1 py-3 text-xs font-semibold tracking-wide border-b-2 text-center transition-all cursor-pointer ${activePropertyTab === "transform" ? "text-accent border-accent bg-accent/5" : "text-text-muted border-transparent hover:text-text-primary"}`}>
               <span className="flex items-center justify-center gap-1.5">
                 <Layout className="w-3.5 h-3.5" />
                 Video (Transform)
@@ -192,30 +175,14 @@ export const PropertiesPanel: React.FC = () => {
 
       {/* Property Contents */}
       <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-6">
+        {/* Render Audio properties if audio clip is selected */}
+        {isAudioClip && <AudioSection selectedClip={selectedClip} handleUpdate={handleUpdate} />}
+
         {/* Render Text Styling studio if text clip is selected and active tab is text */}
-        {isTextClip && activePropertyTab === "text" && (
-          <TextStyleSection
-            textClip={textClip}
-            presets={presets}
-            newPresetName={newPresetName}
-            setNewPresetName={setNewPresetName}
-            handleUpdate={handleUpdate}
-            handleUpdateMultiple={handleUpdateMultiple}
-            handleApplyPreset={handleApplyPreset}
-            savePreset={savePreset}
-            deletePreset={deletePreset}
-          />
-        )}
+        {isTextClip && activePropertyTab === "text" && <TextStyleSection textClip={textClip} presets={presets} newPresetName={newPresetName} setNewPresetName={setNewPresetName} handleUpdate={handleUpdate} handleUpdateMultiple={handleUpdateMultiple} handleApplyPreset={handleApplyPreset} savePreset={savePreset} deletePreset={deletePreset} />}
 
         {/* Video Transform properties (rendered for non-text or if transform tab is selected) */}
-        {(!isTextClip || activePropertyTab === "transform") && (
-          <TransformSection
-            selectedClip={selectedClip}
-            isVisualClip={isVisualClip}
-            handleUpdate={handleUpdate}
-            handleApplyFit={handleApplyFit}
-          />
-        )}
+        {(!isTextClip || activePropertyTab === "transform") && !isAudioClip && <TransformSection selectedClip={selectedClip} isVisualClip={isVisualClip} handleUpdate={handleUpdate} handleApplyFit={handleApplyFit} />}
       </div>
     </div>
   );

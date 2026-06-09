@@ -178,7 +178,7 @@ export async function exportVideo(config: VideoExportConfig): Promise<VideoExpor
         startTime: relativeStartTime,
         duration: relativeDuration,
         trimIn: relativeTrimIn,
-        volume: 1.0,
+        volume: clip.volume ?? 1.0,
       };
     });
 
