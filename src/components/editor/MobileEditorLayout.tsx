@@ -97,21 +97,18 @@ export const MobileEditorLayout: React.FC = () => {
 
       addClip(newClip);
     } else if (type === "text") {
-      const sequenceEndTime = getTimelineEndTime();
-      const playheadTime = getPlaybackClock().time;
-      const startTime = Math.max(0, Math.min(playheadTime, Math.max(0, sequenceEndTime)));
-      const firstUnlockedTextTrack = tracks.find((track) => track.type === "text" && !track.locked);
-      let targetTrackId: string | null = firstUnlockedTextTrack?.id ?? null;
+      // Text clips follow the same placement policy semantics:
+      // playhead-first, no overwrite, create track when occupied.
+      const placement = resolveAddToTimelinePlacement({
+        asset: { type: "video", id: item.id, trackType: "text" },
+        tracks,
+        clips,
+        playheadTime: getPlaybackClock().time,
+        sequenceEndTime: getTimelineEndTime(),
+      });
 
-      if (targetTrackId) {
-        const targetTrackClips = clips.filter((clip) => clip.trackId === targetTrackId);
-        const occupiedAtPlayhead = targetTrackClips.some((clip) => clip.startTime <= startTime && startTime < clip.startTime + clip.duration);
-        if (occupiedAtPlayhead) {
-          targetTrackId = null;
-        }
-      }
-
-      if (!targetTrackId) {
+      let targetTrackId = placement.targetTrackId;
+      if (placement.shouldCreateTrack || !targetTrackId) {
         const latestTracks = useTimelineStore.getState().tracks;
         const insertIndex = getInsertIndexForNewTrack(latestTracks, "text");
         targetTrackId = insertTrackAt("text", insertIndex);
@@ -129,7 +126,7 @@ export const MobileEditorLayout: React.FC = () => {
 
       const textClip = createTextClip({
         trackId: targetTrackId,
-        startTime,
+        startTime: placement.startTime,
         duration: 5.0,
         text: item.text || item.name || "Text",
         canvasWidth: project?.canvasWidth || 1920,
@@ -291,11 +288,18 @@ export const MobileEditorLayout: React.FC = () => {
         useProjectStore.getState().showToast(`${item?.name || "Transition"} added`);
       }
     } else if (type === "filters") {
-      const playheadTime = getPlaybackClock().time;
-      const firstUnlockedFilterTrack = tracks.find((track) => track.type === "filter" && !track.locked);
-      let targetTrackId: string | null = firstUnlockedFilterTrack?.id ?? null;
+      // Filter clips follow the same placement policy semantics:
+      // playhead-first, no overwrite, create track when occupied.
+      const placement = resolveAddToTimelinePlacement({
+        asset: { type: "video", id: item.id, trackType: "filter" },
+        tracks,
+        clips,
+        playheadTime: getPlaybackClock().time,
+        sequenceEndTime: getTimelineEndTime(),
+      });
 
-      if (!targetTrackId) {
+      let targetTrackId = placement.targetTrackId;
+      if (placement.shouldCreateTrack || !targetTrackId) {
         const latestTracks = useTimelineStore.getState().tracks;
         const insertIndex = getInsertIndexForNewTrack(latestTracks, "filter");
         targetTrackId = insertTrackAt("filter", insertIndex);
@@ -309,7 +313,7 @@ export const MobileEditorLayout: React.FC = () => {
         id: generateId("filter-clip"),
         trackId: targetTrackId,
         mediaId: item.id,
-        startTime: playheadTime,
+        startTime: placement.startTime,
         duration: 5.0,
         trimIn: 0,
         trimOut: 5.0,
