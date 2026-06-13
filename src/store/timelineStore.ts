@@ -82,6 +82,7 @@ interface TimelineStore {
   updateClip: (clipId: string, updates: Partial<Clip>) => void;
   addTransition: (transition: TransitionTimelineItem) => void;
   removeTransition: (transitionId: string) => void;
+  updateTransition: (transitionId: string, updates: Partial<TransitionTimelineItem>) => void;
   createTransitionBetweenClips: (fromClipId: string, toClipId: string, type: TransitionType, duration?: number) => { transition?: TransitionTimelineItem; error: string | null };
   moveClip: (clipId: string, startTime: number) => void;
   setZoom: (level: number) => void;
@@ -429,6 +430,22 @@ export const useTimelineStore = create<TimelineStore>(
       set((state) => {
         const next: Partial<TimelineStore> = {
           transitions: state.transitions.filter((transition) => transition.id !== transitionId),
+        };
+        if (state._batchDepth > 0) {
+          next._pendingEpochIncrement = true;
+        } else {
+          next.epoch = state.epoch + 1;
+        }
+        return next;
+      });
+    },
+
+    updateTransition: (transitionId, updates) => {
+      set((state) => {
+        const next: Partial<TimelineStore> = {
+          transitions: state.transitions.map((t) =>
+            t.id === transitionId ? { ...t, ...updates } : t
+          ),
         };
         if (state._batchDepth > 0) {
           next._pendingEpochIncrement = true;

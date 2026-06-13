@@ -177,6 +177,8 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
         shadow: textClip.shadow,
         background: textClip.background,
         styleId: textClip.styleId,
+        templateId: textClip.templateId,
+        customization: textClip.customization,
       };
 
       visualLayers.push(textLayer);
@@ -219,6 +221,7 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
       transitionType: transitionState.type,
       transitionProgress: transitionState.progress,
       blendMode: (clip as any).blendMode || "normal",
+      stickerSettings: (clip as any).stickerSettings,
       effects: clip.effects?.map((fx) => ({
         effectId: fx.id,
         type: "video_effect",

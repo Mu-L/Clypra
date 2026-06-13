@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Type, Layout, Sparkles, Film, Music, Image, FileText, Clock } from "lucide-react";
+import { Type, Layout, Sparkles, Film, Music, Image, FileText, Clock, Shuffle, Smile } from "lucide-react";
 import { useUIStore } from "@/store/uiStore";
 import { useTimelineStore } from "@/store/timelineStore";
 import { useProjectStore } from "@/store/projectStore";
@@ -16,6 +16,8 @@ import { TransformSection } from "./properties/TransformSection";
 import { AudioSection } from "./properties/AudioSection";
 import { TextAnimationControls } from "./properties/TextAnimationControls";
 import { EffectsFiltersSection } from "./properties/EffectsFiltersSection";
+import { TransitionSection } from "./properties/TransitionSection";
+import { StickerSettingsSection } from "./properties/StickerSettingsSection";
 
 const TEXT_BOUNDS_STYLE_KEYS: (keyof TextClip)[] = ["text", "fontSize", "fontFamily", "fontWeight", "fontStyle", "styleId", "stroke", "shadow", "background", "letterSpacing", "lineHeight"];
 const MANUAL_BOUNDS_KEYS: (keyof Clip)[] = ["x", "y", "width", "height"];
@@ -49,8 +51,9 @@ export function buildClipPropertyTransform(clip: Clip, updates: Record<string, u
 }
 
 /** Clip type display info */
-function getClipTypeInfo(assetType: string | undefined, isText: boolean) {
+function getClipTypeInfo(assetType: string | undefined, isText: boolean, isSticker?: boolean) {
   if (isText) return { icon: FileText, label: "Text", color: "text-purple-400" };
+  if (isSticker) return { icon: Smile, label: "Sticker", color: "text-pink-400" };
   switch (assetType) {
     case "video":
       return { icon: Film, label: "Video", color: "text-blue-400" };
@@ -72,14 +75,46 @@ const TEXT_TABS: { id: TextPropertyTab; label: string; icon: React.FC<{ classNam
 ];
 
 export const PropertiesPanel: React.FC = () => {
-  const { selectedClipIds } = useUIStore();
-  const { clips } = useTimelineStore();
+  const { selectedClipIds, selectedTransitionId, clearSelection } = useUIStore();
+  const { clips, transitions, updateTransition, removeTransition } = useTimelineStore();
   const { mediaAssets, project } = useProjectStore();
   const { execute } = useHistoryStore();
 
   const [activePropertyTab, setActivePropertyTab] = useState<TextPropertyTab>("text");
   const [newPresetName, setNewPresetName] = useState("");
   const { presets, savePreset, deletePreset } = usePresetStore();
+
+  const selectedTransition = transitions.find((t) => t.id === selectedTransitionId);
+
+  if (selectedTransitionId && selectedTransition) {
+    return (
+      <div className="w-full md:w-92 min-h-0 panel-shell flex flex-col overflow-hidden shrink-0">
+        <div className="panel-head border-b border-border">
+          <div className="px-4 py-2.5 flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg bg-surface-raised border border-border/40 flex items-center justify-center shrink-0 text-accent">
+              <Shuffle className="w-3.5 h-3.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-text-primary truncate">
+                {selectedTransition.type === "dissolve" ? "Dissolve" : "Fade"} Transition
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-[9px] font-medium text-accent">Transition</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-3">
+          <TransitionSection
+            selectedTransition={selectedTransition}
+            updateTransition={updateTransition}
+            removeTransition={removeTransition}
+            clearSelection={clearSelection}
+          />
+        </div>
+      </div>
+    );
+  }
 
   const selectedClipId = selectedClipIds[0] ?? null;
   const selectedClip = clips.find((c) => c.id === selectedClipId);
@@ -153,8 +188,10 @@ export const PropertiesPanel: React.FC = () => {
     );
   };
 
+  const isSticker = selectedClip?.kind === "sticker" || selectedClip?.mediaId.startsWith("sticker-");
+
   // Clip type info for the header
-  const typeInfo = getClipTypeInfo(selectedAsset?.type, !!isTextClip);
+  const typeInfo = getClipTypeInfo(selectedAsset?.type, !!isTextClip, isSticker);
   const TypeIcon = typeInfo.icon;
   const clipName = isTextClip ? (textClip.text || "Text").slice(0, 24) : selectedAsset?.name || "Clip";
   const clipDuration = selectedClip.duration.toFixed(1);
@@ -201,6 +238,9 @@ export const PropertiesPanel: React.FC = () => {
 
       {/* Property Contents */}
       <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-3">
+        {/* Sticker properties */}
+        {isSticker && <StickerSettingsSection selectedClip={selectedClip} handleUpdate={handleUpdate} />}
+
         {/* Audio properties (audio clips or video clips) */}
         {hasAudioTrack && <AudioSection selectedClip={selectedClip} handleUpdate={handleUpdate} />}
 

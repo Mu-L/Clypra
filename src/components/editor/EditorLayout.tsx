@@ -143,6 +143,7 @@ export const EditorLayout: React.FC = () => {
         background: item.background,
         styleId: item.styleId,
         templateId: item.templateId,
+        customization: item.customization,
       });
 
       addClip(textClip);
@@ -323,7 +324,20 @@ export const EditorLayout: React.FC = () => {
           return;
         }
 
-        const updatedEffects = [...currentEffects, { id: item.id, name: item.name, intensity: 0.5 }];
+        const updatedEffects = [
+          ...currentEffects,
+          {
+            id: item.id,
+            effectId: item.id,
+            type: "effect" as const,
+            renderer: item.renderer || item.id,
+            params: item.params || {},
+            name: item.name,
+            startTime: 0,
+            duration: targetClip.duration,
+            intensity: 0.5,
+          },
+        ];
 
         updateClip(targetClip.id, { effects: updatedEffects });
         useProjectStore.getState().showToast(`Applied ${item.name} effect`);

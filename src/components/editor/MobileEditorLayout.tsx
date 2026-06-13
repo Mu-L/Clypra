@@ -144,6 +144,7 @@ export const MobileEditorLayout: React.FC = () => {
         background: item.background,
         styleId: item.styleId,
         templateId: item.templateId,
+        customization: item.customization,
       });
 
       addClip(textClip);

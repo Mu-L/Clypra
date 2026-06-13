@@ -30,6 +30,7 @@ interface LottieAnimationCacheEntry {
   canvas: HTMLCanvasElement;
   container: HTMLDivElement;
   stickerId: string;
+  cacheKey?: string;
 }
 
 const lottieRenderCache = new Map<string, LottieAnimationCacheEntry>();
@@ -166,11 +167,99 @@ export async function rasterizeScene(scene: EvaluatedScene, target: RasterTarget
     ctx.clip();
   }
 
+  // Identify layers that are part of transitions
+  const transitionsMap = new Map<string, { transition: any; isIncoming: boolean; otherLayerId: string }>();
+  for (const t of scene.transitions) {
+    transitionsMap.set(t.outgoingLayer, { transition: t, isIncoming: false, otherLayerId: t.incomingLayer });
+    transitionsMap.set(t.incomingLayer, { transition: t, isIncoming: true, otherLayerId: t.outgoingLayer });
+  }
+
+  // Pre-render transition frames if needed
+  const transitionFrames = new Map<string, { fromCanvas: OffscreenCanvas | HTMLCanvasElement; toCanvas: OffscreenCanvas | HTMLCanvasElement }>();
+  for (const t of scene.transitions) {
+    const outgoing = scene.visualLayers.find((l) => l.layerId === t.outgoingLayer);
+    const incoming = scene.visualLayers.find((l) => l.layerId === t.incomingLayer);
+    if (outgoing && incoming) {
+      // Create offscreen canvases at full raster resolution
+      const fromCanvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(width, height) : document.createElement("canvas");
+      const toCanvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(width, height) : document.createElement("canvas");
+      if (fromCanvas instanceof HTMLCanvasElement) {
+        fromCanvas.width = width;
+        fromCanvas.height = height;
+      }
+      if (toCanvas instanceof HTMLCanvasElement) {
+        toCanvas.width = width;
+        toCanvas.height = height;
+      }
+      const fromCtx = fromCanvas.getContext("2d") as any;
+      const toCtx = toCanvas.getContext("2d") as any;
+
+      if (fromCtx && toCtx) {
+        // Draw layers onto temporary canvases (with scaling and centering translation applied)
+        fromCtx.save();
+        fromCtx.translate(offsetX, offsetY);
+        if (typeof fromCtx.beginPath === "function") {
+          fromCtx.beginPath();
+          fromCtx.rect(0, 0, scaledCanvasWidth, scaledCanvasHeight);
+          fromCtx.clip();
+        }
+        // Force opacity to 1.0 during transition capture so the TransitionRenderer controls blending
+        await rasterizeLayer(fromCtx, { ...outgoing, opacity: 1.0 }, scale, scale, target);
+        fromCtx.restore();
+
+        toCtx.save();
+        toCtx.translate(offsetX, offsetY);
+        if (typeof toCtx.beginPath === "function") {
+          toCtx.beginPath();
+          toCtx.rect(0, 0, scaledCanvasWidth, scaledCanvasHeight);
+          toCtx.clip();
+        }
+        await rasterizeLayer(toCtx, { ...incoming, opacity: 1.0 }, scale, scale, target);
+        toCtx.restore();
+
+        transitionFrames.set(t.transitionId, { fromCanvas, toCanvas });
+      }
+    }
+  }
+
   // Rasterize all visual layers with uniform scaling
   for (const layer of scene.visualLayers) {
-    // TRACE: Z-order verification (can be removed after validation)
-    console.log("[TRACE][RASTERIZER] Drawing:", layer.clipId.substring(0, 8), "role:", layer.role, "zIndex:", layer.zIndex);
-    await rasterizeLayer(ctx, layer, scale, scale, target);
+    const tInfo = transitionsMap.get(layer.layerId);
+    if (tInfo) {
+      // If outgoing layer, we skip drawing it (it will be blended when we hit the incoming layer)
+      if (!tInfo.isIncoming) {
+        continue;
+      }
+
+      // If incoming layer, render the transition blend!
+      const frames = transitionFrames.get(tInfo.transition.transitionId);
+      if (frames) {
+        ctx.save();
+        // Since the frames are already rendered with offsetX/offsetY, reset transform to draw them full-screen
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        // Import TransitionRenderer from features/video-effects
+        const { TransitionRenderer } = await import("@/features/video-effects/renderers/TransitionRenderer");
+        
+        // Render transition
+        TransitionRenderer.render(
+          ctx as any,
+          frames.fromCanvas as any,
+          frames.toCanvas as any,
+          tInfo.transition.type,
+          {},
+          tInfo.transition.progress
+        );
+        ctx.restore();
+      } else {
+        // Fallback to normal rendering if frames failed to prepare
+        await rasterizeLayer(ctx, layer, scale, scale, target);
+      }
+    } else {
+      // Normal layer rendering
+      console.log("[TRACE][RASTERIZER] Drawing:", layer.clipId.substring(0, 8), "role:", layer.role, "zIndex:", layer.zIndex);
+      await rasterizeLayer(ctx, layer, scale, scale, target);
+    }
   }
 
   ctx.restore();
@@ -225,7 +314,7 @@ async function rasterizeLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRen
   if (layer.layerType === "media") {
     await rasterizeMediaLayer(ctx, layer, width, height, target);
   } else if (layer.layerType === "text") {
-    rasterizeTextLayer(ctx, layer, width, height, scaleX, scaleY);
+    await rasterizeTextLayer(ctx, layer, width, height, scaleX, scaleY);
   }
 
   ctx.restore();
@@ -299,7 +388,15 @@ async function rasterizeMediaLayer(ctx: CanvasRenderingContext2D | OffscreenCanv
         if (cacheEntry) {
           const totalFrames = cacheEntry.anim.totalFrames;
           const frameRate = cacheEntry.anim.frameRate || 30;
-          const frame = Math.floor(layer.sourceTime * frameRate) % totalFrames;
+          const speed = layer.stickerSettings?.speed ?? 1.0;
+          const loop = layer.stickerSettings?.loop ?? true;
+
+          let frame = Math.floor(layer.sourceTime * speed * frameRate);
+          if (loop) {
+            frame = frame % totalFrames;
+          } else {
+            frame = Math.min(frame, totalFrames - 1);
+          }
 
           cacheEntry.anim.goToAndStop(frame, true);
           await Promise.resolve();
@@ -585,7 +682,89 @@ function drawMediaWithSourceRotation(ctx: CanvasRenderingContext2D | OffscreenCa
  * Plain text layers (no styleId) use a minimal Canvas 2D path that
  * respects the same baseline alignment as the engine (fontSize * 0.82).
  */
-function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, layer: EvaluatedTextLayer, width: number, height: number, scaleX: number, scaleY: number): void {
+async function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, layer: EvaluatedTextLayer, width: number, height: number, scaleX: number, scaleY: number): Promise<void> {
+  if (layer.templateId) {
+    const { useTemplateStore } = await import("@/features/text-templates/templateStore");
+    const templates = useTemplateStore.getState().templates;
+    const template = templates.find((t) => t.id === layer.templateId);
+
+    if (template && template.lottieData) {
+      const customizationSig = JSON.stringify(layer.customization || {});
+      const cacheKey = `${layer.clipId}-${layer.templateId}-${customizationSig}`;
+      
+      let cacheEntry = lottieRenderCache.get(layer.clipId);
+      if (cacheEntry && cacheEntry.cacheKey !== cacheKey) {
+        cacheEntry.anim.destroy();
+        cacheEntry.container.remove();
+        lottieRenderCache.delete(layer.clipId);
+        cacheEntry = undefined;
+      }
+
+      if (!cacheEntry) {
+        try {
+          const { injectText, injectColor } = await import("@/features/text-templates/TemplateInjector");
+          
+          const customization = layer.customization || {
+            primaryText: layer.text || "",
+            secondaryText: "",
+            accentText: "",
+            primaryColor: "#ffffff",
+            secondaryColor: "#ffffff",
+          };
+
+          let injectedLottie = injectText(template.lottieData, customization, template.textLayers);
+          if (customization.primaryColor) {
+            injectedLottie = injectColor(injectedLottie, "primary-fill-layer", customization.primaryColor);
+          }
+          if (customization.secondaryColor) {
+            injectedLottie = injectColor(injectedLottie, "secondary-fill-layer", customization.secondaryColor);
+          }
+
+          const container = document.createElement("div");
+          container.style.width = `${width}px`;
+          container.style.height = `${height}px`;
+          container.style.position = "absolute";
+          container.style.left = "-9999px";
+          container.style.top = "-9999px";
+          document.body.appendChild(container);
+
+          const anim = lottie.loadAnimation({
+            container,
+            renderer: "canvas",
+            autoplay: false,
+            loop: true,
+            animationData: JSON.parse(JSON.stringify(injectedLottie)),
+          });
+
+          anim.goToAndStop(0, true);
+          await Promise.resolve();
+
+          const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+          if (canvas) {
+            cacheEntry = { anim, canvas, container, stickerId: layer.templateId, cacheKey };
+            lottieRenderCache.set(layer.clipId, cacheEntry);
+          }
+        } catch (err) {
+          console.error("[Rasterizer] Failed to load text template Lottie animation:", err);
+        }
+      }
+
+      if (cacheEntry) {
+        const totalFrames = cacheEntry.anim.totalFrames;
+        const frameRate = cacheEntry.anim.frameRate || 30;
+        
+        const localTime = layer.time !== undefined && layer.clipStartTime !== undefined ? layer.time - layer.clipStartTime : 0;
+        const frame = Math.floor(localTime * frameRate) % totalFrames;
+
+        cacheEntry.anim.goToAndStop(frame, true);
+        await Promise.resolve();
+
+        ctx.drawImage(cacheEntry.canvas, 0, 0, width, height);
+        return;
+      }
+    }
+  }
+
   // fontSize for rendering: scaled to match the layer's on-canvas pixel size.
   const fontSize = layer.fontSize * scaleY;
   const effectDef = layer.styleId ? useEffectsStore.getState().definitions[layer.styleId] : undefined;

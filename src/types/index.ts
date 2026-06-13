@@ -185,6 +185,7 @@ export interface ClipEffect {
   type: "effect";
   renderer: string; // "shake", "blur", "glitch", etc.
   params: Record<string, any>; // Effect-specific parameters
+  name?: string;
 
   // Timing (relative to clip)
   startTime: number;
@@ -252,6 +253,7 @@ export interface TextClip extends Clip {
   paddingY: number;
   styleId?: string;
   templateId?: string;
+  customization?: any;
   /** Role of the text clip: caption for subtitles, title for decorative text/graphics */
   textRole?: "caption" | "title";
   /** Word-level timestamps for karaoke-style caption highlighting (optional) */

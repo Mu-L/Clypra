@@ -11,6 +11,17 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { VideoEffectManifest, VideoEffectItem, OverlayAsset, EffectPreset, TransitionPreset, VideoEffectCategory, EffectCategory } from "../types";
 import { VideoEffectsApi } from "../api/clypraApi";
+import { videoEffectsCacheManager, type CachedOverlay, type VideoEffectsDownloadProgress } from "@/lib/cache/videoEffectsCache";
+
+export type VideoEffectsDownloadStatus = "idle" | "downloading" | "completed" | "error";
+
+export interface VideoEffectsDownloadState {
+  itemId: string;
+  status: VideoEffectsDownloadStatus;
+  progress: number; // 0-100
+  cachedOverlay?: CachedOverlay;
+  error?: string;
+}
 
 interface VideoEffectsState {
   // Manifest
@@ -23,8 +34,11 @@ interface VideoEffectsState {
   categoryLoading: Record<string, boolean>;
   categoryErrors: Record<string, string | null>;
 
-  // Downloaded overlays (Object URLs)
+  // Downloaded overlays (Object URLs or Local File URLs)
   overlayURLs: Map<string, string>;
+
+  // Download states for overlays
+  downloads: Record<string, VideoEffectsDownloadState>;
 
   // User favorites (persisted)
   favorites: Set<string>;
@@ -36,6 +50,20 @@ interface VideoEffectsState {
   preloadOverlays: (overlays: OverlayAsset[]) => Promise<void>;
   search: (query: string, type?: EffectCategory) => Promise<VideoEffectItem[]>;
 
+  // Cache & Disk Download Actions
+  initializeCache: () => Promise<void>;
+  startDownload: (overlay: OverlayAsset) => Promise<CachedOverlay>;
+  getDownloadState: (itemId: string) => VideoEffectsDownloadState | null;
+  isDownloaded: (itemId: string) => boolean;
+  getCachedOverlay: (itemId: string) => CachedOverlay | null;
+  clearDownloadState: (itemId: string) => void;
+  clearCache: (itemId: string) => Promise<void>;
+
+  // Internal setters for downloads
+  _updateDownloadProgress: (itemId: string, progress: number) => void;
+  _setDownloadCompleted: (itemId: string, cachedOverlay: CachedOverlay) => void;
+  _setDownloadError: (itemId: string, error: string) => void;
+
   // Favorites
   addFavorite: (id: string) => void;
   removeFavorite: (id: string) => void;
@@ -43,9 +71,9 @@ interface VideoEffectsState {
   isFavorite: (id: string) => boolean;
 
   // Cache management
-  clearCache: () => void;
-  clearOverlayCache: () => void;
-  getCacheStats: () => ReturnType<typeof VideoEffectsApi.getCacheStats>;
+  clearAllLocalCaches: () => Promise<void>;
+  clearOverlayCache: () => Promise<void>;
+  getCacheStats: () => ReturnType<typeof VideoEffectsApi.getCacheStats> & { diskCount: number; diskSize: number };
 }
 
 export const useVideoEffectsStore = create<VideoEffectsState>()(
@@ -59,7 +87,41 @@ export const useVideoEffectsStore = create<VideoEffectsState>()(
       categoryLoading: {},
       categoryErrors: {},
       overlayURLs: new Map(),
+      downloads: {},
       favorites: new Set(),
+
+      // Initialize cache (loads already downloaded items from disk index)
+      initializeCache: async () => {
+        try {
+          await videoEffectsCacheManager.initialize();
+          const cached = videoEffectsCacheManager.getAllCached();
+
+          const downloads: Record<string, VideoEffectsDownloadState> = { ...get().downloads };
+          const overlayURLs = new Map(get().overlayURLs);
+
+          const { appCacheDir, join } = await import("@tauri-apps/api/path");
+          const { convertFileSrc } = await import("@tauri-apps/api/core");
+          const appCache = await appCacheDir();
+
+          for (const file of cached) {
+            const absolutePath = await join(appCache, file.localPath);
+            const localUrl = convertFileSrc(absolutePath);
+            
+            downloads[file.id] = {
+              itemId: file.id,
+              status: "completed",
+              progress: 100,
+              cachedOverlay: file,
+            };
+
+            overlayURLs.set(file.id, localUrl);
+          }
+
+          set({ downloads, overlayURLs });
+        } catch (error) {
+          console.error("[VideoEffectsStore] Failed to initialize cache:", error);
+        }
+      },
 
       // Load manifest
       loadManifest: async () => {
@@ -124,25 +186,184 @@ export const useVideoEffectsStore = create<VideoEffectsState>()(
         }
       },
 
-      // Download overlay asset
+      // Start downloading an overlay to disk
+      startDownload: async (overlay: OverlayAsset): Promise<CachedOverlay> => {
+        const { downloads } = get();
+
+        // Check if already completed
+        if (videoEffectsCacheManager.isCached(overlay.id)) {
+          const cached = videoEffectsCacheManager.getCached(overlay.id)!;
+          return cached;
+        }
+
+        if (downloads[overlay.id]?.status === "downloading") {
+          // If already downloading, wait for it or return promise
+          const checkCompletion = (): Promise<CachedOverlay> => {
+            return new Promise((resolve, reject) => {
+              const unsubscribe = useVideoEffectsStore.subscribe((state) => {
+                const dl = state.downloads[overlay.id];
+                if (dl?.status === "completed" && dl.cachedOverlay) {
+                  unsubscribe();
+                  resolve(dl.cachedOverlay);
+                } else if (dl?.status === "error") {
+                  unsubscribe();
+                  reject(new Error(dl.error || "Download failed"));
+                }
+              });
+            });
+          };
+          return checkCompletion();
+        }
+
+        set({
+          downloads: {
+            ...downloads,
+            [overlay.id]: {
+              itemId: overlay.id,
+              status: "downloading",
+              progress: 0,
+            },
+          },
+        });
+
+        try {
+          const cachedOverlay = await videoEffectsCacheManager.downloadOverlay(overlay, (progress) => {
+            get()._updateDownloadProgress(overlay.id, progress.percentage);
+          });
+
+          // Resolve absolute path and set URL
+          const { appCacheDir, join } = await import("@tauri-apps/api/path");
+          const { convertFileSrc } = await import("@tauri-apps/api/core");
+          const appCache = await appCacheDir();
+          const absolutePath = await join(appCache, cachedOverlay.localPath);
+          const localUrl = convertFileSrc(absolutePath);
+
+          set((state) => {
+            const newURLs = new Map(state.overlayURLs);
+            newURLs.set(overlay.id, localUrl);
+            return { overlayURLs: newURLs };
+          });
+
+          get()._setDownloadCompleted(overlay.id, cachedOverlay);
+          return cachedOverlay;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Download failed";
+          get()._setDownloadError(overlay.id, errorMessage);
+          throw error;
+        }
+      },
+
+      getDownloadState: (itemId: string) => {
+        const state = get().downloads[itemId];
+        if (state) return state;
+
+        if (videoEffectsCacheManager.isCached(itemId)) {
+          const cached = videoEffectsCacheManager.getCached(itemId)!;
+          return {
+            itemId,
+            status: "completed",
+            progress: 100,
+            cachedOverlay: cached,
+          };
+        }
+
+        return null;
+      },
+
+      isDownloaded: (itemId: string) => {
+        return videoEffectsCacheManager.isCached(itemId);
+      },
+
+      getCachedOverlay: (itemId: string) => {
+        return videoEffectsCacheManager.getCached(itemId);
+      },
+
+      clearDownloadState: (itemId: string) => {
+        const { downloads } = get();
+        const updated = { ...downloads };
+        delete updated[itemId];
+        set({ downloads: updated });
+      },
+
+      clearCache: async (itemId: string) => {
+        await videoEffectsCacheManager.clearCache(itemId);
+        set((state) => {
+          const newURLs = new Map(state.overlayURLs);
+          newURLs.delete(itemId);
+          return { overlayURLs: newURLs };
+        });
+        get().clearDownloadState(itemId);
+      },
+
+      _updateDownloadProgress: (itemId: string, progress: number) => {
+        const { downloads } = get();
+        if (!downloads[itemId]) return;
+        set({
+          downloads: {
+            ...downloads,
+            [itemId]: {
+              ...downloads[itemId],
+              progress,
+            },
+          },
+        });
+      },
+
+      _setDownloadCompleted: (itemId: string, cachedOverlay: CachedOverlay) => {
+        const { downloads } = get();
+        if (!downloads[itemId]) return;
+        set({
+          downloads: {
+            ...downloads,
+            [itemId]: {
+              ...downloads[itemId],
+              status: "completed",
+              progress: 100,
+              cachedOverlay,
+            },
+          },
+        });
+      },
+
+      _setDownloadError: (itemId: string, error: string) => {
+        const { downloads } = get();
+        if (!downloads[itemId]) return;
+        set({
+          downloads: {
+            ...downloads,
+            [itemId]: {
+              ...downloads[itemId],
+              status: "error",
+              progress: 0,
+              error,
+            },
+          },
+        });
+      },
+
+      // Download overlay asset (Wrapper keeping compatibility with URL returns)
       downloadOverlay: async (overlay: OverlayAsset): Promise<string> => {
         const state = get();
 
-        // Return cached URL if available
+        // Return cached URL if available in memory
         if (state.overlayURLs.has(overlay.id)) {
           return state.overlayURLs.get(overlay.id)!;
         }
 
         try {
-          const objectURL = await VideoEffectsApi.getOverlayObjectURL(overlay);
+          const cachedOverlay = await get().startDownload(overlay);
+          const appCache = await import("@tauri-apps/api/path").then((m) => m.appCacheDir());
+          const absolutePath = await import("@tauri-apps/api/path").then((m) => m.join(appCache, cachedOverlay.localPath));
+          const { convertFileSrc } = await import("@tauri-apps/api/core");
+          const localUrl = convertFileSrc(absolutePath);
 
           set((state) => {
             const newURLs = new Map(state.overlayURLs);
-            newURLs.set(overlay.id, objectURL);
+            newURLs.set(overlay.id, localUrl);
             return { overlayURLs: newURLs };
           });
 
-          return objectURL;
+          return localUrl;
         } catch (error) {
           console.error(`Failed to download overlay "${overlay.name}":`, error);
           throw error;
@@ -203,18 +424,10 @@ export const useVideoEffectsStore = create<VideoEffectsState>()(
       },
 
       // Cache management
-      clearCache: () => {
-        const state = get();
-
-        // Revoke all Object URLs
-        state.overlayURLs.forEach((url) => {
-          URL.revokeObjectURL(url);
-        });
-
-        // Clear API cache
+      clearAllLocalCaches: async () => {
+        await videoEffectsCacheManager.clearAllCache();
         VideoEffectsApi.clearLocalCache();
 
-        // Reset state
         set({
           manifest: null,
           manifestError: null,
@@ -222,37 +435,41 @@ export const useVideoEffectsStore = create<VideoEffectsState>()(
           categoryLoading: {},
           categoryErrors: {},
           overlayURLs: new Map(),
+          downloads: {},
         });
       },
 
-      clearOverlayCache: () => {
-        const state = get();
-
-        // Revoke all Object URLs
-        state.overlayURLs.forEach((url) => {
-          URL.revokeObjectURL(url);
-        });
-
-        // Clear API overlay cache
+      clearOverlayCache: async () => {
+        await videoEffectsCacheManager.clearAllCache();
         VideoEffectsApi.clearOverlayCache();
 
-        // Reset overlay URLs
-        set({ overlayURLs: new Map() });
+        set({ overlayURLs: new Map(), downloads: {} });
       },
 
       getCacheStats: () => {
-        return VideoEffectsApi.getCacheStats();
+        const apiStats = VideoEffectsApi.getCacheStats();
+        const diskStats = videoEffectsCacheManager.getCacheStats();
+
+        return {
+          ...apiStats,
+          diskCount: diskStats.count,
+          diskSize: diskStats.totalSize,
+        };
       },
     }),
     {
       name: "clypra-video-effects-store",
       partialize: (state) => ({
-        // Only persist favorites
+        // Persist favorites as well as manifest and categories JSON to satisfy offline loading
         favorites: Array.from(state.favorites),
+        manifest: state.manifest,
+        categories: state.categories,
       }),
       merge: (persistedState: any, currentState) => ({
         ...currentState,
         favorites: new Set(persistedState?.favorites || []),
+        manifest: persistedState?.manifest || null,
+        categories: persistedState?.categories || {},
       }),
     },
   ),
@@ -335,3 +552,7 @@ export function useManifest() {
 
 // Add React import for hooks
 import React from "react";
+
+// Initialize cache on startup
+useVideoEffectsStore.getState().initializeCache();
+
