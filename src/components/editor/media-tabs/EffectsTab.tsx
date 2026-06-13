@@ -114,30 +114,6 @@ export const EffectsTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           <input type="text" placeholder="Search effects..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-surface-raised/70 border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent" />
         </div>
-        <div className="mt-1.5 flex items-center gap-1 overflow-x-auto whitespace-nowrap pb-0.5" style={{ scrollbarWidth: "none" }}>
-          <FilterChip active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
-            All states
-          </FilterChip>
-          <FilterChip active={statusFilter === "ready"} onClick={() => setStatusFilter("ready")}>
-            Ready
-          </FilterChip>
-          <FilterChip active={statusFilter === "soon"} onClick={() => setStatusFilter("soon")}>
-            Soon
-          </FilterChip>
-          <div className="mx-1 h-4 w-px shrink-0 bg-border/70" />
-          <FilterChip active={strengthFilter === "all"} onClick={() => setStrengthFilter("all")}>
-            Any strength
-          </FilterChip>
-          <FilterChip active={strengthFilter === "subtle"} onClick={() => setStrengthFilter("subtle")}>
-            Subtle
-          </FilterChip>
-          <FilterChip active={strengthFilter === "medium"} onClick={() => setStrengthFilter("medium")}>
-            Medium
-          </FilterChip>
-          <FilterChip active={strengthFilter === "strong"} onClick={() => setStrengthFilter("strong")}>
-            Strong
-          </FilterChip>
-        </div>
       </div>
 
       <div className="grow overflow-y-auto scrollbar-thin p-2">
@@ -150,16 +126,6 @@ export const EffectsTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
             </div>
           </div>
         )}
-
-        <div className="mb-2 rounded-lg border border-border/40 bg-surface-raised/35 px-2.5 py-2">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-accent-soft shrink-0" />
-              <p className="text-[11px] font-semibold text-text-primary truncate">{isCategoryLoading && filteredEffects.length === 0 ? "Loading..." : `${filteredEffects.length} effects`}</p>
-            </div>
-            {!isCategoryLoading && <p className="text-[10px] text-text-muted shrink-0">{readyCount} ready</p>}
-          </div>
-        </div>
 
         {isCategoryLoading && filteredEffects.length === 0 ? (
           <div className="grid grid-cols-2 gap-2">
@@ -186,12 +152,6 @@ export const EffectsTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
     </div>
   );
 };
-
-const FilterChip: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
-  <button type="button" onClick={onClick} className={`shrink-0 rounded-sm border px-2 py-1 text-[10px] font-semibold transition-colors cursor-pointer ${active ? "border-accent/30 bg-accent/15 text-accent-soft" : "border-border/40 text-text-muted hover:bg-surface-raised/60 hover:text-text-primary"}`}>
-    {children}
-  </button>
-);
 
 const SkeletonCard = () => (
   <div className="animate-pulse rounded-lg border border-border/30 bg-surface-raised/40 overflow-hidden h-[180px] flex flex-col justify-between">
