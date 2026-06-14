@@ -277,6 +277,29 @@ pub async fn transcribe_audio_local(
 
     eprintln!("🦀 [transcribe_audio_local] Transcribing: {} (model: {}, lang: {})", audio_path, model, lang_param);
 
+    // Get app data directory for models
+    let app_data_dir: String = std::env::var("TAURI_APP_DATA_DIR")
+        .or_else(|_| -> Result<String, String> {
+            // Fallback: construct it manually
+            let home = std::env::var("HOME")
+                .or_else(|_| std::env::var("USERPROFILE"))
+                .map_err(|_| "Could not determine home directory".to_string())?;
+            
+            #[cfg(target_os = "macos")]
+            let path = format!("{}/Library/Application Support/com.clypra.editor", home);
+            
+            #[cfg(target_os = "windows")]
+            let path = format!("{}\\AppData\\Roaming\\com.clypra.editor", home);
+            
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+            let path = format!("{}/.local/share/com.clypra.editor", home);
+            
+            Ok(path)
+        }).map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    
+    let models_dir = format!("{}/models/whisper", app_data_dir);
+    eprintln!("🦀 [transcribe_audio_local] Models directory: {}", models_dir);
+
     // Verify Python script exists
     let mut script_path = PathBuf::from("src/features/text-effects/transcribe.py");
     if !script_path.exists() {
@@ -337,12 +360,13 @@ pub async fn transcribe_audio_local(
         eprintln!("🦀 [transcribe_audio_local] Using language hint prompt: {}", p);
     }
 
-    // Build command arguments with model, language, and optional prompt
+    // Build command arguments with model, language, model directory, and optional prompt
     let mut args = vec![
         "run".to_string(),
         script_path_str.clone(),
         audio_path.clone(),
         format!("--model={}", model),
+        format!("--model-dir={}", models_dir),
     ];
     
     // Add language argument if not auto

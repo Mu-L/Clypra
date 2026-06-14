@@ -23,6 +23,11 @@ def main():
         help="Model size: tiny, base, small, medium, large-v3",
     )
     parser.add_argument(
+        "--model-dir",
+        default=None,
+        help="Directory containing Whisper model files (.pt)",
+    )
+    parser.add_argument(
         "--language",
         default=None,
         help="Language code (e.g., en, es, fr) or None for auto-detect",
@@ -36,7 +41,13 @@ def main():
     try:
         # Load the specified Whisper model
         print(f"Loading Whisper model: {args.model}", file=sys.stderr)
-        model = whisper.load_model(args.model)
+
+        # Set download root if model directory is specified
+        if args.model_dir:
+            print(f"Using model directory: {args.model_dir}", file=sys.stderr)
+            model = whisper.load_model(args.model, download_root=args.model_dir)
+        else:
+            model = whisper.load_model(args.model)
 
         # Prepare transcription options
         transcribe_options = {
