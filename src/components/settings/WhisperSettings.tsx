@@ -223,6 +223,28 @@ function ModelCard({ model }: { model: ModelInfo }) {
   const isActive = captionSettings.activeModel === model.size;
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Verify model exists on disk when component mounts (if marked as downloaded)
+  useEffect(() => {
+    const verifyModelOnMount = async () => {
+      if (modelState.status === "downloaded") {
+        try {
+          const exists = await invoke<boolean>("verify_whisper_model_exists", { size: model.size });
+          if (!exists) {
+            console.warn(`[WhisperSettings] Model "${model.size}" marked as downloaded but files not found. Resetting state.`);
+            resetModelState(model.size);
+            if (isActive) {
+              setActiveModel(null as any);
+            }
+          }
+        } catch (error) {
+          console.error(`[WhisperSettings] Failed to verify model "${model.size}":`, error);
+        }
+      }
+    };
+
+    verifyModelOnMount();
+  }, []); // Run once on mount
+
   useEffect(() => {
     // Listen for download progress events
     const unlisten = listen<{
@@ -293,9 +315,26 @@ function ModelCard({ model }: { model: ModelInfo }) {
     setIsDownloading(false);
   };
 
-  const handleSetActive = () => {
+  const handleSetActive = async () => {
     if (modelState.status === "downloaded") {
-      setActiveModel(model.size);
+      // Verify the model actually exists on disk before setting as active
+      try {
+        const exists = await invoke<boolean>("verify_whisper_model_exists", { size: model.size });
+        if (!exists) {
+          updateModelDownloadState(model.size, {
+            status: "error",
+            errorMessage: "Model files not found on disk. Please re-download.",
+          });
+          return;
+        }
+        setActiveModel(model.size);
+      } catch (error) {
+        console.error("Failed to verify model:", error);
+        updateModelDownloadState(model.size, {
+          status: "error",
+          errorMessage: "Failed to verify model files.",
+        });
+      }
     }
   };
 

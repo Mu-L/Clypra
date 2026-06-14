@@ -133,3 +133,41 @@ pub async fn cancel_whisper_download(
     eprintln!("🦀 [cancel_whisper_download] Would cancel download for: {}", size);
     Ok(())
 }
+
+/// Verify if a Whisper model is actually downloaded to disk
+#[tauri::command]
+pub async fn verify_whisper_model_exists(
+    app: tauri::AppHandle,
+    size: String,
+) -> Result<bool, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    let model_path = app_data_dir
+        .join("models")
+        .join("whisper")
+        .join(format!("{}.bin", size));
+
+    let exists = model_path.exists() && model_path.is_file();
+    
+    if exists {
+        // Also check file size to ensure it's not a corrupted/empty file
+        if let Ok(metadata) = std::fs::metadata(&model_path) {
+            let file_size = metadata.len();
+            eprintln!("🦀 [verify_whisper_model_exists] Model '{}' at {:?}: exists ({}MB)", 
+                size, model_path, file_size / 1_048_576);
+            
+            // Whisper models should be at least 1MB (even tiny is ~39MB)
+            if file_size < 1_000_000 {
+                eprintln!("⚠️ [verify_whisper_model_exists] Model file too small, likely corrupted");
+                return Ok(false);
+            }
+        }
+    } else {
+        eprintln!("🦀 [verify_whisper_model_exists] Model '{}' at {:?}: not found", size, model_path);
+    }
+    
+    Ok(exists)
+}

@@ -155,11 +155,33 @@ export const CaptionsTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
     const model = captionSettings.activeModel || "tiny"; // Default to tiny if none selected
     const language = captionSettings.language || "auto"; // Default to auto-detect
 
-    // Check if the selected model is downloaded
+    console.log(`[CaptionsTab] Starting auto-generate with model: ${model}, language: ${language}`);
+
+    // Check if the selected model is marked as downloaded in store
     const modelState = captionSettings.models[model];
     if (modelState.status !== "downloaded") {
+      console.error(`[CaptionsTab] Model "${model}" status is: ${modelState.status}`);
       setErrorMsg(`Whisper model "${model}" is not downloaded yet. Please go to Settings → Captions to download the model first.`);
       // Open settings modal to help user
+      toggleSettingsModal();
+      return;
+    }
+
+    // Verify the model actually exists on disk (double-check)
+    try {
+      console.log(`[CaptionsTab] Verifying model "${model}" exists on disk...`);
+      const exists = await invoke<boolean>("verify_whisper_model_exists", { size: model });
+      console.log(`[CaptionsTab] Model verification result: ${exists}`);
+
+      if (!exists) {
+        console.error(`[CaptionsTab] Model "${model}" marked as downloaded but files not found on disk`);
+        setErrorMsg(`Model files for "${model}" not found on disk. The model may have been deleted or corrupted. Please re-download the model from Settings → Captions.`);
+        toggleSettingsModal();
+        return;
+      }
+    } catch (error) {
+      console.error(`[CaptionsTab] Failed to verify model:`, error);
+      setErrorMsg(`Failed to verify model files: ${error}. Please check Settings → Captions.`);
       toggleSettingsModal();
       return;
     }
@@ -171,9 +193,12 @@ export const CaptionsTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
     });
 
     if (mediaClips.length === 0) {
+      console.warn(`[CaptionsTab] No media clips found on timeline`);
       setErrorMsg("No video or audio clips found on the timeline. Add media first.");
       return;
     }
+
+    console.log(`[CaptionsTab] Found ${mediaClips.length} media clips to process`);
 
     setErrorMsg(null);
     setIsGenerating(true);

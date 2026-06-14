@@ -277,39 +277,7 @@ pub async fn transcribe_audio_local(
 
     eprintln!("🦀 [transcribe_audio_local] Transcribing: {} (model: {}, lang: {})", audio_path, model, lang_param);
 
-    // Build language hint prompt if hints are provided
-    let prompt = if let Some(hints) = language_hints {
-        if !hints.is_empty() {
-            let lang_names: Vec<String> = hints.iter().map(|code| {
-                match code.as_str() {
-                    "en" => "English".to_string(),
-                    "es" => "Spanish".to_string(),
-                    "fr" => "French".to_string(),
-                    "de" => "German".to_string(),
-                    "it" => "Italian".to_string(),
-                    "pt" => "Portuguese".to_string(),
-                    "ru" => "Russian".to_string(),
-                    "ja" => "Japanese".to_string(),
-                    "ko" => "Korean".to_string(),
-                    "zh" => "Chinese".to_string(),
-                    "ar" => "Arabic".to_string(),
-                    "hi" => "Hindi".to_string(),
-                    _ => code.clone(),
-                }
-            }).collect();
-            Some(format!("This audio may contain speech in {}. Transcribe accordingly.", lang_names.join(", ")))
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
-    if let Some(ref p) = prompt {
-        eprintln!("🦀 [transcribe_audio_local] Using language hint prompt: {}", p);
-    }
-
-    // Resolve script path robustly to handle different current working directories in Tauri
+    // Verify Python script exists
     let mut script_path = PathBuf::from("src/features/text-effects/transcribe.py");
     if !script_path.exists() {
         script_path = PathBuf::from("../src/features/text-effects/transcribe.py");
@@ -330,8 +298,44 @@ pub async fn transcribe_audio_local(
         }
     }
 
+    if !script_path.exists() {
+        return Err(format!("Transcription script not found. Expected at: {:?}", script_path));
+    }
+
     let script_path_str = script_path.to_str().ok_or("Failed to convert script path to string")?.to_string();
     eprintln!("🦀 [transcribe_audio_local] Resolved script path: {}", script_path_str);
+
+    // Build language hint prompt if hints are provided
+    let prompt = if let Some(hints) = language_hints {
+        if !hints.is_empty() {
+            let lang_names: Vec<String> = hints.iter().map(|code| {
+                match code.as_str() {
+                    "en" => "English",
+                    "es" => "Spanish",
+                    "fr" => "French",
+                    "de" => "German",
+                    "it" => "Italian",
+                    "pt" => "Portuguese",
+                    "ru" => "Russian",
+                    "ja" => "Japanese",
+                    "ko" => "Korean",
+                    "zh" => "Chinese",
+                    "ar" => "Arabic",
+                    "hi" => "Hindi",
+                    _ => code.as_str(),
+                }.to_string()
+            }).collect();
+            Some(format!("This audio may contain speech in {}. Transcribe accordingly.", lang_names.join(", ")))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    if let Some(ref p) = prompt {
+        eprintln!("🦀 [transcribe_audio_local] Using language hint prompt: {}", p);
+    }
 
     // Build command arguments with model, language, and optional prompt
     let mut args = vec![
