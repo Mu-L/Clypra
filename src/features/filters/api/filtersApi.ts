@@ -5,7 +5,7 @@
 
 import type { FilterAsset, FilterCategory } from "../types";
 
-const API_BASE_URL = import.meta.env.VITE_CLYPRA_API_URL;
+const API_BASE_URL = "https://clypra-worker-api.abdulkabirmusa.com";
 
 export class FiltersApi {
   /**
