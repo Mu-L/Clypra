@@ -1164,10 +1164,6 @@ async function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanva
       : undefined,
     background: layer.background,
   });
-  const effectPaddingX = Math.max(fontSize * 0.25, declaredBleed.x * scaleX);
-  const effectPaddingY = Math.max(fontSize * 0.25, declaredBleed.y * scaleY);
-  const offW = Math.max(1, Math.ceil(width + effectPaddingX * 2));
-  const offH = Math.max(1, Math.ceil(height + effectPaddingY * 2));
 
   // CRITICAL: Calculate UNSCALED dimensions for _buildConfig()
   // The effect must be rendered at original canvas resolution, then scaled for preview quality.
@@ -1182,6 +1178,10 @@ async function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanva
   });
   const unscaledPaddingX = Math.max(unscaledFontSize * 0.25, unscaledBleed.x);
   const unscaledPaddingY = Math.max(unscaledFontSize * 0.25, unscaledBleed.y);
+  const effectPaddingX = unscaledPaddingX * scaleX;
+  const effectPaddingY = unscaledPaddingY * scaleY;
+  const offW = Math.max(1, Math.ceil(width + effectPaddingX * 2));
+  const offH = Math.max(1, Math.ceil(height + effectPaddingY * 2));
   // Defensive checks: Ensure dimensions are valid positive numbers to prevent rendering crashes
   const safeWidth = Number.isFinite(layer.width) && layer.width > 0 ? layer.width : 100;
   const safeHeight = Number.isFinite(layer.height) && layer.height > 0 ? layer.height : 100;

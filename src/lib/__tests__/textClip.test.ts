@@ -227,6 +227,30 @@ describe("calculateTextClipSize", () => {
     expect(withAppliedPlate.source).toBe("panel");
     expect(withAppliedPlate.contentWidth - definitionOnly.contentWidth).toBeCloseTo(36);
     expect(withAppliedPlate.contentHeight - definitionOnly.contentHeight).toBeCloseTo(36);
+    expect(withAppliedPlate.selectionInset).toBeGreaterThan(0);
+  });
+
+  it("adds a small panel selection inset so the visible plate sits inside handles", () => {
+    const panel = measureTextEffectContentBounds({
+      text: "MY TEXT",
+      fontFamily: "Permanent Marker",
+      fontSize: 175,
+      fontWeight: 700,
+      background: { color: "#161618", padding: 20, borderRadius: 0 },
+      canvasWidth: 1080,
+    });
+    const plain = measureTextEffectContentBounds({
+      text: "MY TEXT",
+      fontFamily: "Permanent Marker",
+      fontSize: 175,
+      fontWeight: 700,
+      canvasWidth: 1080,
+    });
+
+    expect(panel.source).toBe("panel");
+    expect(panel.selectionInset).toBeGreaterThanOrEqual(4);
+    expect(panel.selectionInset).toBeLessThanOrEqual(12);
+    expect(plain.selectionInset).toBe(0);
   });
 
   it("scales definition panel padding like the engine build config", () => {

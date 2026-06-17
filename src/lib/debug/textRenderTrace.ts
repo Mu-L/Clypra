@@ -19,6 +19,7 @@ export interface CanvasAlphaBounds {
   visiblePixels: number;
   sampledPixels: number;
   alphaMax: number;
+  sampledRegion: { width: number; height: number; clipped: boolean };
   bounds: { x: number; y: number; width: number; height: number } | null;
 }
 
@@ -26,8 +27,8 @@ export function sampleCanvasAlpha(ctx: CanvasRenderingContext2D | OffscreenCanva
   if (!isTextRenderTraceEnabled()) return null;
 
   try {
-    const w = Math.max(1, Math.min(Math.floor(width), 512));
-    const h = Math.max(1, Math.min(Math.floor(height), 512));
+    const w = Math.max(1, Math.min(Math.floor(width), 4096));
+    const h = Math.max(1, Math.min(Math.floor(height), 4096));
     const image = ctx.getImageData(0, 0, w, h);
     const step = Math.max(4, Math.floor(image.data.length / 4096 / 4) * 4);
     let visiblePixels = 0;
@@ -58,6 +59,7 @@ export function sampleCanvasAlpha(ctx: CanvasRenderingContext2D | OffscreenCanva
       visiblePixels,
       sampledPixels,
       alphaMax,
+      sampledRegion: { width: w, height: h, clipped: w < Math.floor(width) || h < Math.floor(height) },
       bounds: maxX >= minX && maxY >= minY ? { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 } : null,
     };
   } catch (error) {

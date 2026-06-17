@@ -86,6 +86,7 @@ export interface TextEffectBounds {
   measuredTextWidth: number;
   measuredTextHeight: number;
   source: "panel" | "ink" | "plain" | "fallback";
+  selectionInset: number;
 }
 
 function measureTextInk(text: string, fontFamily: string, fontSize: number, bold: boolean, letterSpacing = 0): { width: number; height: number } {
@@ -212,12 +213,13 @@ export function measureTextEffectContentBounds(options: { text: string; fontFami
     contentPaddingY = Math.max(6, options.fontSize * 0.08);
   }
 
-  const singleLineWidth = measured.width + contentPaddingX * 2;
+  const selectionInset = source === "panel" ? Math.max(4, Math.min(12, options.fontSize * 0.04)) : 0;
+  const singleLineWidth = measured.width + contentPaddingX * 2 + selectionInset * 2;
   const width = Math.min(maxWidth, Math.max(48, singleLineWidth));
-  const contentInnerWidth = Math.max(1, width - contentPaddingX * 2);
+  const contentInnerWidth = Math.max(1, width - contentPaddingX * 2 - selectionInset * 2);
   const wrappedLineCount = Math.max(1, Math.ceil(measured.width / contentInnerWidth));
   const textHeight = source === "panel" ? options.fontSize * wrappedLineCount : measured.height * wrappedLineCount;
-  const height = Math.max(24, textHeight + contentPaddingY * 2);
+  const height = Math.max(24, textHeight + contentPaddingY * 2 + selectionInset * 2);
 
   textRenderTrace("text-bounds-measure", {
     text: options.text,
@@ -231,6 +233,7 @@ export function measureTextEffectContentBounds(options: { text: string; fontFami
     hasDeclaredBounds,
     measured,
     contentPadding: { x: contentPaddingX, y: contentPaddingY },
+    selectionInset,
     textHeight,
     contentBounds: { width, height },
     renderBleed,
@@ -247,6 +250,7 @@ export function measureTextEffectContentBounds(options: { text: string; fontFami
     measuredTextWidth: measured.width,
     measuredTextHeight: measured.height,
     source,
+    selectionInset,
   };
 }
 
