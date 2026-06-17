@@ -92,6 +92,8 @@ export const TextSourcePreview: React.FC<TextSourcePreviewProps> = ({ preset }) 
       glowLayers: config.glowLayers || [],
     };
 
+    console.log("[TextSourcePreview] 🎨 Rendering preview using config:", effectConfig);
+
     console.log("[TextSourcePreview] Raw preset fontFamily:", (preset as any).fontFamily);
     console.log("[TextSourcePreview] Full preset keys:", Object.keys(preset as any).slice(0, 15));
     console.log("[TextSourcePreview] Canvas dimensions from preset:", {

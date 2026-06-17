@@ -362,7 +362,9 @@ export const useEffectsStore = create<EffectsState>((set, get) => ({
     const data = await res.json();
     const fetchTime = (performance.now() - startTime).toFixed(2);
 
+    console.log(`[EffectsStore:Cache] 📥 Fetched raw data from API for "${id}":`, data);
     const definition = convertRawConfigToDefinition(data);
+    console.log(`[EffectsStore:Cache] ⚙️ Converted definition for cache for "${id}":`, definition);
 
     console.log(`[EffectsStore:Cache] ✅ API FETCH SUCCESS - Effect "${id}" downloaded in ${fetchTime}ms`);
     console.log(`[EffectsStore:Cache] 💾 Caching effect "${id}" to memory + IndexedDB`);
@@ -442,8 +444,10 @@ export const useEffectsStore = create<EffectsState>((set, get) => ({
       .then((data) => {
         const prefetchTime = (performance.now() - startTime).toFixed(2);
         console.log(`[EffectsStore:Prefetch] ✅ Prefetch complete for ${id} in ${prefetchTime}ms`);
+        console.log(`[EffectsStore:Prefetch] 📥 Prefetched raw data from API for "${id}":`, data);
 
         const definition = convertRawConfigToDefinition(data);
+        console.log(`[EffectsStore:Prefetch] ⚙️ Converted prefetch definition for "${id}":`, definition);
 
         set((s) => {
           const nextPrefetching = new Set(s.prefetchingIds);
