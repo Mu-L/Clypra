@@ -31,20 +31,20 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
 pub enum SpatialTier {
-    L0 = 0, // 80×45
-    L1 = 1, // 120×67
-    L2 = 2, // 160×90
-    L3 = 3, // 240×135
+    L0 = 0, // 160×90
+    L1 = 1, // 240×135
+    L2 = 2, // 320×180
+    L3 = 3, // 480×270
 }
 
 impl SpatialTier {
     /// Base pixel dimensions [width, height] — spec-defined.
     pub fn dims(self) -> (u32, u32) {
         match self {
-            SpatialTier::L0 => (80, 45),
-            SpatialTier::L1 => (120, 67),
-            SpatialTier::L2 => (160, 90),
-            SpatialTier::L3 => (240, 135),
+            SpatialTier::L0 => (160, 90),
+            SpatialTier::L1 => (240, 135),
+            SpatialTier::L2 => (320, 180),
+            SpatialTier::L3 => (480, 270),
         }
     }
 
@@ -669,7 +669,7 @@ mod tests {
     fn aspect_preserving_tier_dims_keeps_landscape_ratio() {
         let (width, height) = aspect_preserving_tier_dims(1920, 1080, SpatialTier::L2);
 
-        assert_eq!((width, height), (160, 90));
+        assert_eq!((width, height), (320, 180));
         assert_aspect_close(width, height, 16.0 / 9.0);
     }
 
@@ -677,7 +677,7 @@ mod tests {
     fn aspect_preserving_tier_dims_keeps_portrait_ratio() {
         let (width, height) = aspect_preserving_tier_dims(1080, 1920, SpatialTier::L2);
 
-        assert_eq!((width, height), (90, 160));
+        assert_eq!((width, height), (180, 320));
         assert_ne!((width, height), SpatialTier::L2.dims());
         assert_aspect_close(width, height, 9.0 / 16.0);
     }
@@ -686,7 +686,7 @@ mod tests {
     fn aspect_preserving_tier_dims_keeps_square_ratio() {
         let (width, height) = aspect_preserving_tier_dims(1000, 1000, SpatialTier::L1);
 
-        assert_eq!((width, height), (120, 120));
+        assert_eq!((width, height), (240, 240));
         assert_aspect_close(width, height, 1.0);
     }
 
@@ -702,7 +702,7 @@ mod tests {
             .1
             .expect("downsample result");
 
-        assert_eq!((frame.width, frame.height), (46, 80));
+        assert_eq!((frame.width, frame.height), (90, 160));
         assert_eq!(frame.data.len(), (frame.width * frame.height * 4) as usize);
         assert_aspect_close(frame.width, frame.height, 18.0 / 32.0);
     }

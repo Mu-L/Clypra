@@ -100,8 +100,8 @@ impl ResolutionTier {
 
     pub fn dimensions(&self) -> (u32, u32) {
         match self {
-            ResolutionTier::Tier1x => (80, 60),
-            ResolutionTier::Tier2x => (160, 120),
+            ResolutionTier::Tier1x => (160, 90),
+            ResolutionTier::Tier2x => (320, 180),
         }
     }
 

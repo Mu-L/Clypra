@@ -22,18 +22,18 @@
  *   L0: 0.25–0.5×  |  L1: 0.5–1×  |  L2: 1–2×  |  L3: 2–4×
  */
 export enum SpatialTier {
-  L0 = 0, // 80×45   — lowest resolution, widest zoom-out
-  L1 = 1, // 120×67
-  L2 = 2, // 160×90
-  L3 = 3, // 240×135 — highest resolution, closest zoom-in
+  L0 = 0, // 160×90   — lowest resolution, widest zoom-out
+  L1 = 1, // 240×135
+  L2 = 2, // 320×180
+  L3 = 3, // 480×270  — highest resolution, closest zoom-in
 }
 
 /** Base pixel dimensions [width, height] for each spatial tier. */
 export const SPATIAL_TIER_DIMS: Record<SpatialTier, readonly [number, number]> = {
-  [SpatialTier.L0]: [80, 45],
-  [SpatialTier.L1]: [120, 67],
-  [SpatialTier.L2]: [160, 90],
-  [SpatialTier.L3]: [240, 135],
+  [SpatialTier.L0]: [160, 90],
+  [SpatialTier.L1]: [240, 135],
+  [SpatialTier.L2]: [320, 180],
+  [SpatialTier.L3]: [480, 270],
 } as const;
 
 // ─── Temporal Tier ────────────────────────────────────────────────────────────
