@@ -351,23 +351,40 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
     const itemId = item.id;
     if (downloadingIds.includes(itemId)) return;
 
-    startDownload(itemId);
+    const isDownloaded = type === "template"
+      ? downloadedTemplates.includes(itemId)
+      : downloadedEffects.includes(itemId);
 
-    // Lazy load the full vector parameters concurrently with the spinner
-    let fullEffect: any = null;
-    if (type === "effect") {
-      try {
-        fullEffect = await TextEffectsApi.getFullEffect(item.category, item.id);
-      } catch (err) {
-        console.error("[Clypra:TextTab] Failed to lazy load detailed config on click:", err);
+    if (!isDownloaded) {
+      startDownload(itemId);
+
+      // Lazy load the full vector parameters concurrently with the spinner
+      if (type === "effect") {
+        try {
+          await TextEffectsApi.getFullEffect(item.category, item.id);
+        } catch (err) {
+          console.error("[Clypra:TextTab] Failed to lazy load detailed config on click:", err);
+        }
+      } else {
+        try {
+          await selectTemplate(item);
+        } catch (err) {
+          console.error("[Clypra:TextTab] Failed to lazy load Lottie data on click:", err);
+        }
       }
-    }
 
-    setTimeout(() => {
-      completeDownload(itemId, type);
-
+      setTimeout(() => {
+        completeDownload(itemId, type);
+      }, 850);
+    } else {
       // Apply to timeline
       if (type === "effect") {
+        let fullEffect: any = null;
+        try {
+          fullEffect = await TextEffectsApi.getFullEffect(item.category, item.id);
+        } catch (err) {
+          console.error("[Clypra:TextTab] Failed to get effect config on apply:", err);
+        }
         const targetEffect = fullEffect || item;
         onAddToTimeline?.(
           {
@@ -396,14 +413,14 @@ export const TextTab: React.FC<TabProps> = ({ onAddToTimeline }) => {
         // Quick apply template with default customization if bypass preview
         onAddToTimeline?.(
           {
-            name: item.name,
+            name: item.name || item.label,
             presetType: "template",
             templateId: item.id,
           },
           "text",
         );
       }
-    }, 850);
+    }
   };
 
   const handleTemplateAdd = (template: TemplateDefinition, customization: TemplateCustomization) => {

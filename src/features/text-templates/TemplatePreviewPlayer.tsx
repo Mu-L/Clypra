@@ -2,7 +2,6 @@ import React, {
   useEffect, useRef, useImperativeHandle,
   forwardRef, useState
 } from 'react';
-import { TemplateRenderer, TextTemplate } from '@clypra/engine';
 
 export interface TemplatePreviewPlayerHandle {
   play:        () => void;
@@ -42,11 +41,8 @@ export const TemplatePreviewPlayer = forwardRef<TemplatePreviewPlayerHandle, Tem
     className,
     onFrameChange,
   }, ref) => {
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const videoRef = useRef<HTMLVideoElement | null>(null);
     const [isPlaying, setIsPlaying] = useState(autoplay);
-    const [currentTime, setCurrentTime] = useState(0);
-    const requestRef = useRef<number | null>(null);
-    const previousTimeRef = useRef<number | null>(null);
 
     const onReadyRef = useRef(onReady);
     const onCompleteRef = useRef(onComplete);
@@ -68,17 +64,19 @@ export const TemplatePreviewPlayer = forwardRef<TemplatePreviewPlayerHandle, Tem
       },
       stop: () => {
         setIsPlaying(false);
-        setCurrentTime(0);
+        if (videoRef.current) {
+          videoRef.current.currentTime = 0;
+        }
       },
       goToFrame: (frame: number) => {
         setIsPlaying(false);
-        if (template) {
+        if (template && videoRef.current) {
           const fps = template.fps || 30;
-          setCurrentTime(frame / fps);
+          videoRef.current.currentTime = frame / fps;
         }
       },
       getAnimation: () => ({
-        totalFrames: template ? Math.round(template.duration * (template.fps || 30)) : 0,
+        totalFrames: template ? Math.round((template.duration || 4) * (template.fps || 30)) : 0,
         frameRate: template?.fps || 30,
         isLoaded: !!template,
       }),
@@ -86,70 +84,39 @@ export const TemplatePreviewPlayer = forwardRef<TemplatePreviewPlayerHandle, Tem
 
     // Trigger ready callback on mount if data is present
     useEffect(() => {
-      if (template) {
+      if (template && videoRef.current) {
         onReadyRef.current?.();
       }
     }, [template]);
 
+    // Apply speed
+    useEffect(() => {
+      if (videoRef.current) {
+        videoRef.current.playbackRate = speed;
+      }
+    }, [speed]);
+
+    // Control video playback based on isPlaying state
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      if (isPlaying) {
+        video.play().catch((err) => {
+          console.warn("Video play failed:", err);
+        });
+      } else {
+        video.pause();
+      }
+    }, [isPlaying]);
+
     // Apply initial frame once template is loaded
     useEffect(() => {
-      if (template && initialFrame !== undefined) {
+      if (template && initialFrame !== undefined && videoRef.current) {
         const fps = template.fps || 30;
-        setCurrentTime(initialFrame / fps);
+        videoRef.current.currentTime = initialFrame / fps;
       }
     }, [template, initialFrame]);
-
-    // Redraw loop
-    useEffect(() => {
-      if (!template || !canvasRef.current) return;
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      const renderer = new TemplateRenderer(template);
-      renderer.drawFrame(ctx, currentTime);
-
-      // Fire frame updates
-      const fps = template.fps || 30;
-      const totalFrames = Math.round(template.duration * fps);
-      const currentFrame = Math.round(currentTime * fps);
-      onFrameChangeRef.current?.(currentFrame, totalFrames);
-    }, [template, currentTime]);
-
-    // Animation Tick
-    const tick = (timestamp: number) => {
-      if (previousTimeRef.current !== null && template) {
-        const elapsed = (timestamp - previousTimeRef.current) / 1000;
-        const nextTime = currentTime + elapsed * speed;
-        
-        if (nextTime >= template.duration) {
-          if (loop) {
-            setCurrentTime(0);
-          } else {
-            setIsPlaying(false);
-            onCompleteRef.current?.();
-          }
-        } else {
-          setCurrentTime(nextTime);
-        }
-      }
-      previousTimeRef.current = timestamp;
-      requestRef.current = requestAnimationFrame(tick);
-    };
-
-    useEffect(() => {
-      if (isPlaying) {
-        previousTimeRef.current = null;
-        requestRef.current = requestAnimationFrame(tick);
-      } else {
-        if (requestRef.current) {
-          cancelAnimationFrame(requestRef.current);
-        }
-      }
-      return () => {
-        if (requestRef.current) cancelAnimationFrame(requestRef.current);
-      };
-    }, [isPlaying, currentTime, speed, template]);
 
     if (!template) {
       return (
@@ -159,13 +126,37 @@ export const TemplatePreviewPlayer = forwardRef<TemplatePreviewPlayerHandle, Tem
       );
     }
 
+    const previewUrl =
+      template.preview ||
+      `https://clypra-worker-api.abdulkabirmusa.com/media/text-templates/${template.category}/${template.id}.webm`;
+
     return (
       <div className={className} style={{ position: 'relative', width, height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <canvas
-          ref={canvasRef}
-          width={template.canvasWidth}
-          height={template.canvasHeight}
+        <video
+          ref={videoRef}
+          src={previewUrl}
+          loop={loop}
+          muted
+          playsInline
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          onLoadedData={() => {
+            onReadyRef.current?.();
+          }}
+          onEnded={() => {
+            if (!loop) {
+              setIsPlaying(false);
+              onCompleteRef.current?.();
+            }
+          }}
+          onTimeUpdate={() => {
+            const video = videoRef.current;
+            if (video && template) {
+              const fps = template.fps || 30;
+              const totalFrames = Math.round((template.duration || 4) * fps);
+              const currentFrame = Math.round(video.currentTime * fps);
+              onFrameChangeRef.current?.(currentFrame, totalFrames);
+            }
+          }}
         />
       </div>
     );
