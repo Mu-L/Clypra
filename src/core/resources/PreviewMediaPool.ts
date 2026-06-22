@@ -235,7 +235,12 @@ export class PreviewMediaPool {
 
       if (asset?.type === "video") {
         const sourcePath = asset.path.startsWith("asset://") ? asset.path : convertFileSrc(asset.path);
-        const cacheKey = `${clip.mediaId}-${sourcePath}`; // Key by MEDIA, not clip
+
+        // Cache key strategy: For split clips that share media, we need separate elements
+        // to prevent rebinding conflicts during overlap. Use trimIn to differentiate.
+        const trimIn = clip.trimIn || 0;
+        const cacheKey = `${clip.mediaId}-${sourcePath}-trim${trimIn.toFixed(3)}`;
+
         const sourceTime = getClipSourceTime(clip, syncState.time);
         const isActive = sourceTime !== null; // Is clip in active playback window?
 
@@ -648,16 +653,29 @@ export class PreviewMediaPool {
       if (video.seeking) {
         return;
       }
-      // Professional policy:
-      // - Audible stream: avoid frequent seeks (they cause audible glitches)
-      // - Silent decode streams: keep tighter sync for visual fidelity
+
       const drift = Math.abs(video.currentTime - clampedTime);
-      const hardSeekThreshold = isPrimaryAudibleVideo ? 1.0 : 0.5;
-      const minSeekIntervalMs = isPrimaryAudibleVideo ? 1500 : 400;
       const now = performance.now();
-      if (drift > hardSeekThreshold && now - managed.lastHardSeekAtMs > minSeekIntervalMs) {
+
+      // Detect user scrubbing: large drift change (>2s) indicates manual seek
+      const isUserScrubbing = drift > 2.0;
+
+      if (isUserScrubbing) {
+        // User scrubbing: immediate seek, no rate limiting
         video.currentTime = clampedTime;
         managed.lastHardSeekAtMs = now;
+      } else {
+        // Automatic sync: rate-limited seeks to prevent audio glitches
+        // Professional policy:
+        // - Audible stream: avoid frequent seeks (they cause audible glitches)
+        // - Silent decode streams: keep tighter sync for visual fidelity
+        const hardSeekThreshold = isPrimaryAudibleVideo ? 1.0 : 0.5;
+        const minSeekIntervalMs = isPrimaryAudibleVideo ? 1500 : 400;
+
+        if (drift > hardSeekThreshold && now - managed.lastHardSeekAtMs > minSeekIntervalMs) {
+          video.currentTime = clampedTime;
+          managed.lastHardSeekAtMs = now;
+        }
       }
     } else {
       const drift = Math.abs(video.currentTime - clampedTime);
