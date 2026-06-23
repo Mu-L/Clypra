@@ -543,6 +543,7 @@ export const ProgramPreview: React.FC = () => {
               speed: playbackSpeed,
               muted: isMuted,
               volume,
+              frameRate: state.project?.frameRate ?? 30,
             });
           } catch (error) {
             console.error(`[PreviewPanel ERROR] Exception calling syncPreviewMedia:`, error);

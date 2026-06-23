@@ -42,6 +42,8 @@ export interface PreviewSyncState {
   muted: boolean;
   /** Master volume (0-100) */
   volume: number;
+  /** Project frame rate for frame-aware tolerance calculations */
+  frameRate: 24 | 30 | 60;
 }
 
 interface ManagedVideo {
@@ -110,15 +112,21 @@ function findPrimaryVideoClip(videoClips: Clip[], tracks: Array<{ id: string; ty
 /**
  * Calculate the source time for a clip at a given clock time.
  *
- * BOUNDARY HANDLING: Uses a small tolerance (16ms ~= 1 frame at 60fps) to keep
+ * BOUNDARY HANDLING: Uses a frame-rate-aware tolerance (1.5 frames) to keep
  * clips active slightly beyond their boundaries. This prevents stuttering during
  * split transitions by ensuring continuous decode/playback.
+ *
+ * FINDING-005: Replaced hardcoded 16ms (60fps) with dynamic calculation based on
+ * project frame rate. Examples:
+ * - 24fps: 1.5 frames = 62.5ms tolerance
+ * - 30fps: 1.5 frames = 50ms tolerance
+ * - 60fps: 1.5 frames = 25ms tolerance
  */
-function getClipSourceTime(clip: Clip, clockTime: number): number | null {
+function getClipSourceTime(clip: Clip, clockTime: number, frameRate: number): number | null {
   const clipLocalTime = clockTime - clip.startTime;
 
-  // Allow small tolerance beyond boundaries to prevent stutter at splits
-  const BOUNDARY_TOLERANCE = 0.016; // ~1 frame at 60fps
+  // FINDING-005: Frame-rate-aware boundary tolerance (1.5 frames)
+  const BOUNDARY_TOLERANCE = 1.5 / frameRate; // seconds
 
   if (clipLocalTime < -BOUNDARY_TOLERANCE || clipLocalTime > clip.duration + BOUNDARY_TOLERANCE) {
     return null; // Clip not active
@@ -185,6 +193,11 @@ export class PreviewMediaPool {
   // LRU cache limits
   private readonly MAX_CACHED_VIDEOS = 20;
   private readonly CACHE_EVICTION_AGE_MS = 60000; // 60 seconds unused (increased for split workflows)
+
+  // FINDING-008: Memory-aware eviction thresholds
+  private readonly ESTIMATED_MB_PER_VIDEO = 50; // Estimated memory per video element (buffer + decode state)
+  private readonly MEMORY_SOFT_LIMIT_MB = 500; // Start aggressive eviction at 500MB
+  private readonly MEMORY_HARD_LIMIT_MB = 800; // Force eviction at 800MB regardless of protection
 
   // ─── RE-ENTRANCY PROTECTION ─────────────────────────────────────────────
   private _syncInProgress = false;
@@ -301,7 +314,7 @@ export class PreviewMediaPool {
           const normalizedTrimIn = Math.round(trimIn * 1000) / 1000;
           const cacheKey = `${clip.mediaId}-${sourcePath}-trim${normalizedTrimIn.toFixed(3)}`;
 
-          const sourceTime = getClipSourceTime(clip, syncState.time);
+          const sourceTime = getClipSourceTime(clip, syncState.time, syncState.frameRate);
           const isActive = sourceTime !== null; // Is clip in active playback window?
 
           desiredVideoBindings.set(clip.id, { cacheKey, clip, asset, isActive });
@@ -352,7 +365,7 @@ export class PreviewMediaPool {
             if (!a || a.type !== "video") return false;
             const t = this.trackMap.get(c.trackId);
             if (t?.visible === false) return false;
-            return getClipSourceTime(c, syncState.time) !== null;
+            return getClipSourceTime(c, syncState.time, syncState.frameRate) !== null;
           });
           const primaryVideoClip = findPrimaryVideoClip(activeVisibleVideoClips, tracks);
           const isPrimaryAudibleVideo = primaryVideoClip?.id === clip.id;
@@ -820,7 +833,7 @@ export class PreviewMediaPool {
 
   private updateVideoElement(managed: ManagedVideo, clip: Clip, syncState: PreviewSyncState, tracks: Array<{ id: string; type: string }>, isPrimaryAudibleVideo: boolean, isTrackMuted: boolean): void {
     const video = managed.element;
-    const sourceTime = getClipSourceTime(clip, syncState.time);
+    const sourceTime = getClipSourceTime(clip, syncState.time, syncState.frameRate);
 
     // Combine global preview volume with per-clip volume
     const clipVolume = clip.volume ?? 1.0;
@@ -1091,6 +1104,12 @@ export class PreviewMediaPool {
    *
    * FINDING-018 FIX: Enforce hard limit even if all elements protected.
    * Prefer evicting inactive elements but respect MAX_CACHED_VIDEOS limit.
+   *
+   * FINDING-008 FIX: Add memory-aware adaptive eviction.
+   * - Estimates memory usage (elements × 50MB per element)
+   * - Soft limit (500MB): Reduce eviction age from 60s to 30s
+   * - Hard limit (800MB): Reduce to 10s, ignore timeline protection
+   * Prevents browser crashes on 50+ clip projects during scrubbing.
    */
   private evictUnusedElements(): void {
     const now = performance.now();
@@ -1099,15 +1118,27 @@ export class PreviewMediaPool {
     // Build set of cache keys that are protected (referenced by timeline clips)
     const protectedCacheKeys = new Set(this.timelineClipRegistry.values());
 
-    // PASS 1: Find candidates - unused for CACHE_EVICTION_AGE_MS AND not in timeline
+    // FINDING-008: Estimate current memory usage and adjust eviction aggressiveness
+    const estimatedMemoryMB = this.videoCache.size * this.ESTIMATED_MB_PER_VIDEO;
+    const isOverSoftLimit = estimatedMemoryMB > this.MEMORY_SOFT_LIMIT_MB;
+    const isOverHardLimit = estimatedMemoryMB > this.MEMORY_HARD_LIMIT_MB;
+
+    // Dynamically adjust eviction age based on memory pressure
+    const effectiveEvictionAge = isOverHardLimit
+      ? 10000 // 10s at hard limit (800MB+) - aggressive eviction
+      : isOverSoftLimit
+        ? 30000 // 30s at soft limit (500MB+) - moderate eviction
+        : this.CACHE_EVICTION_AGE_MS; // 60s normal - standard LRU
+
+    // PASS 1: Find candidates - unused for effectiveEvictionAge AND not in timeline
     for (const [key, managed] of this.videoCache) {
-      // NEVER evict elements for clips still in timeline
-      if (protectedCacheKeys.has(key)) {
+      // At hard limit, ignore protection (emergency eviction to prevent crash)
+      if (protectedCacheKeys.has(key) && !isOverHardLimit) {
         continue;
       }
 
       const age = now - managed.lastUsedAt;
-      if (age > this.CACHE_EVICTION_AGE_MS) {
+      if (age > effectiveEvictionAge) {
         toEvict.push(key);
       }
     }
@@ -1319,7 +1350,7 @@ export class PreviewMediaPool {
 
   private updateAudioElement(managed: ManagedAudio, clip: Clip, syncState: PreviewSyncState, isTrackMuted: boolean): void {
     const audio = managed.element;
-    const sourceTime = getClipSourceTime(clip, syncState.time);
+    const sourceTime = getClipSourceTime(clip, syncState.time, syncState.frameRate);
 
     // Combine global preview volume with per-clip volume
     const clipVolume = clip.volume ?? 1.0; // Default to 1.0 if not set
