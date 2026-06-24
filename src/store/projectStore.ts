@@ -195,6 +195,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   createProject: async (name, aspectRatio, frameRate) => {
+    console.log("🆕 [PROJECT STORE] Creating new project:", name);
+
+    // Reset all state from any previous project BEFORE creating new one
+    try {
+      const { resetAllProjectState } = await import("@/core/runtime/ProjectStateReset");
+      const resetResult = await resetAllProjectState();
+
+      if (!resetResult.success) {
+        console.warn("⚠️ Some subsystems failed to reset:", resetResult.errors);
+      }
+    } catch (err) {
+      console.error("❌ [PROJECT STORE] State reset failed:", err);
+    }
+
     const sanitizedName = sanitizeProjectName(name);
     const dims = getAspectRatioDimensions(aspectRatio);
     const project: Project = {
@@ -211,37 +225,61 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     };
 
     set({ project, mediaAssets: [] });
+    console.log("  ✅ Project created");
 
     // Let timelineStore reset its own state
     try {
       const { useTimelineStore } = await import("./timelineStore");
-      useTimelineStore.getState().hydrateFromProject({ tracks: [], clips: [], transitions: [] });
+      useTimelineStore.getState().hydrateFromProject({ tracks: [], clips: [], transitions: [], gaps: [] });
+      console.log("  ✅ Timeline initialized");
     } catch (err) {
-      // Timeline hydration failed silently
+      console.error("  ❌ Timeline initialization failed:", err);
     }
 
     // Initialize runtime session
     try {
       const { createProjectSession } = await import("@/core/runtime/ProjectSession");
       await createProjectSession(project.id);
+      console.log("  ✅ Session initialized");
     } catch (err) {
-      // Runtime initialization failed silently
+      console.error("  ❌ Session initialization failed:", err);
     }
 
     get().scheduleAutoSave();
+    console.log("✅ [PROJECT STORE] New project created successfully");
   },
 
   loadProject: async (project, payload) => {
-    // Dispose previous runtime first
+    console.log("📂 [PROJECT STORE] Loading project:", project.name);
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PHASE 1: Dispose Previous Runtime & Reset State
+    // ═══════════════════════════════════════════════════════════════════════════════
     try {
       const { disposeActiveSession } = await import("@/core/runtime/ProjectSession");
       await disposeActiveSession();
+      console.log("  ✅ Previous session disposed");
     } catch (err) {
-      // Runtime disposal failed silently
+      console.error("  ❌ Previous session disposal failed:", err);
     }
 
-    // Apply project and mediaAssets (projectStore owns these)
+    // Reset all project-scoped state BEFORE loading new project
+    try {
+      const { resetAllProjectState } = await import("@/core/runtime/ProjectStateReset");
+      const resetResult = await resetAllProjectState();
+
+      if (!resetResult.success) {
+        console.warn("⚠️ Some subsystems failed to reset:", resetResult.errors);
+      }
+    } catch (err) {
+      console.error("❌ [PROJECT STORE] State reset failed:", err);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PHASE 2: Load Project & Media Assets
+    // ═══════════════════════════════════════════════════════════════════════════════
     set({ project, mediaAssets: payload?.mediaAssets ?? [] });
+    console.log("  ✅ Project and media assets loaded");
 
     await preloadTextEffectDefinitionsFromClips(payload?.clips);
 
@@ -253,7 +291,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       // Preload failed silently
     }
 
-    // Let timelineStore hydrate its own state (respects ownership boundary)
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PHASE 3: Hydrate Timeline State
+    // ═══════════════════════════════════════════════════════════════════════════════
     try {
       const { useTimelineStore } = await import("./timelineStore");
       const normalizedClips = normalizeLoadedTextEffectClipBounds(payload?.clips ?? [], project);
@@ -261,35 +301,43 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         tracks: payload?.tracks ?? [],
         clips: normalizedClips,
         transitions: payload?.transitions ?? [],
-        gaps: (payload as any)?.gaps ?? [], // Load gaps from project
+        gaps: (payload as any)?.gaps ?? [],
       });
+      console.log("  ✅ Timeline hydrated");
     } catch (err) {
+      console.error("  ❌ Timeline hydration failed:", err);
       // On error, reset timeline to empty state
       import("./timelineStore").then(({ useTimelineStore }) => useTimelineStore.getState().hydrateFromProject({ tracks: [], clips: [], transitions: [], gaps: [] })).catch(() => {});
     }
 
-    // Initialize runtime LAST — stores are now fully populated
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PHASE 4: Initialize New Runtime Session
+    // ═══════════════════════════════════════════════════════════════════════════════
     try {
       const { createProjectSession } = await import("@/core/runtime/ProjectSession");
       await createProjectSession(project.id);
+      console.log("  ✅ New session initialized");
     } catch (err) {
-      // Runtime initialization failed silently
+      console.error("  ❌ Session initialization failed:", err);
     }
 
-    // Prewarm video decoders for all video assets (non-blocking, runs in background)
-    // Reduces first-frame latency from 50-100ms to 5-10ms
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PHASE 5: Prewarm Video Decoders (Background)
+    // ═══════════════════════════════════════════════════════════════════════════════
     try {
       const { prewarmDecoders } = await import("@/lib/platform/tauri");
       const videoAssets = (payload?.mediaAssets ?? []).filter((a) => a.type === "video");
       if (videoAssets.length > 0) {
         const videoPaths = videoAssets.map((a) => a.path);
         prewarmDecoders(videoPaths).then((count) => {
-          console.log(`[ProjectStore] Prewarmed ${count}/${videoPaths.length} video decoders`);
+          console.log(`  ✅ Prewarmed ${count}/${videoPaths.length} video decoders`);
         });
       }
     } catch (err) {
       // Prewarming failed silently - graceful degradation
     }
+
+    console.log("✅ [PROJECT STORE] Project loaded successfully");
   },
 
   addMediaAsset: (asset) => {
@@ -379,6 +427,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   closeProject: async () => {
+    console.log("🏠 [PROJECT STORE] Closing project...");
+
     // Ensure any pending auto-save completes before closing
     if (autoSaveTimer) {
       clearTimeout(autoSaveTimer);
@@ -404,23 +454,53 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         }
       }
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PHASE 1: Dispose Runtime Session
+    // ═══════════════════════════════════════════════════════════════════════════════
     // Dispose runtime after we've saved timeline state to avoid save-read race
     try {
       const { disposeActiveSession } = await import("@/core/runtime/ProjectSession");
       await disposeActiveSession();
+      console.log("  ✅ ProjectSession disposed");
     } catch (err) {
-      // Runtime disposal failed silently
+      console.error("  ❌ ProjectSession disposal failed:", err);
     }
 
-    // Now clear project and media assets
-    set({ project: null, mediaAssets: [] });
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PHASE 2: Reset All Project-Scoped State (CENTRALIZED)
+    // ═══════════════════════════════════════════════════════════════════════════════
+    try {
+      const { resetAllProjectState } = await import("@/core/runtime/ProjectStateReset");
+      const resetResult = await resetAllProjectState();
 
+      if (!resetResult.success) {
+        console.warn("⚠️ Some subsystems failed to reset:", resetResult.errors);
+      }
+    } catch (err) {
+      console.error("❌ [PROJECT STORE] State reset failed:", err);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PHASE 3: Clear ProjectStore State
+    // ═══════════════════════════════════════════════════════════════════════════════
+    set({ project: null, mediaAssets: [] });
+    console.log("  ✅ ProjectStore cleared");
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PHASE 4: Reset Timeline State
+    // ═══════════════════════════════════════════════════════════════════════════════
     // Let timelineStore clear its own state
     import("./timelineStore")
       .then(({ useTimelineStore }) => {
-        useTimelineStore.getState().hydrateFromProject({ tracks: [], clips: [], transitions: [] });
+        useTimelineStore.getState().hydrateFromProject({ tracks: [], clips: [], transitions: [], gaps: [] });
+        console.log("  ✅ TimelineStore reset");
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error("  ❌ TimelineStore reset failed:", err);
+      });
+
+    console.log("✅ [PROJECT STORE] Project closed successfully");
   },
 
   scheduleAutoSave: () => {
