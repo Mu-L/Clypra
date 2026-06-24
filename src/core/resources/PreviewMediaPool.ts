@@ -30,6 +30,7 @@
 
 import type { Clip, MediaAsset } from "@/types";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { resolveClipSourceTime } from "../timeline/sourceTime";
 
 export interface PreviewSyncState {
   /** Current playback time (seconds) */
@@ -116,6 +117,9 @@ function findPrimaryVideoClip(videoClips: Clip[], tracks: Array<{ id: string; ty
  * clips active slightly beyond their boundaries. This prevents stuttering during
  * split transitions by ensuring continuous decode/playback.
  *
+ * ✅ CRITICAL FIX (FINDING-001): Now uses canonical resolveClipSourceTime utility
+ * to ensure consistency with export and other subsystems.
+ *
  * FINDING-005: Replaced hardcoded 16ms (60fps) with dynamic calculation based on
  * project frame rate. Examples:
  * - 24fps: 1.5 frames = 62.5ms tolerance
@@ -132,13 +136,13 @@ function getClipSourceTime(clip: Clip, clockTime: number, frameRate: number): nu
     return null; // Clip not active
   }
 
-  const trimIn = clip.trimIn || 0;
-  const trimOut = clip.trimOut ?? trimIn + clip.duration;
-  const sourceTime = Math.max(0, trimIn + clipLocalTime);
+  // ✅ Use canonical source time calculation with clamping
+  const { sourceTime } = resolveClipSourceTime(clip, clockTime, {
+    clampToRange: true,
+    frameRate,
+  });
 
-  // Keep the last decodable frame alive exactly at the clip boundary.
-  // This avoids a black flash when a split lands on the current playhead.
-  return Math.min(sourceTime, Math.max(0, trimOut - 0.001));
+  return sourceTime;
 }
 
 function getClipPrewarmSourceTime(clip: Clip, clockTime: number): number | null {

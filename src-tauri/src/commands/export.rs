@@ -58,8 +58,10 @@ pub struct ExportAudioClip {
     /// Trim in offset in seconds inside the source media file
     pub trim_in: f64,
     
-    /// Volume multiplier
-    pub volume: f32,
+    /// Volume multiplier (0.0-1.0)
+    /// ✅ CRITICAL FIX (FINDING-002): Changed from f32 to f64 to match TypeScript precision
+    /// This prevents precision loss during serialization round-trips
+    pub volume: f64,
 
     /// Fade-in duration in seconds
     pub fade_in: Option<f64>,
