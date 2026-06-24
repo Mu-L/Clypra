@@ -40,13 +40,13 @@ describe("PlaybackClock — FINDING-017: RAF Generation Counter", () => {
 
   beforeEach(() => {
     // Setup mocks
-    originalRAF = global.requestAnimationFrame;
-    originalCAF = global.cancelAnimationFrame;
-    originalAudioContext = (global as any).AudioContext;
+    originalRAF = globalThis.requestAnimationFrame;
+    originalCAF = globalThis.cancelAnimationFrame;
+    originalAudioContext = (globalThis as any).AudioContext;
 
-    global.requestAnimationFrame = mockRequestAnimationFrame as any;
-    global.cancelAnimationFrame = mockCancelAnimationFrame as any;
-    (global as any).AudioContext = MockAudioContext;
+    globalThis.requestAnimationFrame = mockRequestAnimationFrame as any;
+    globalThis.cancelAnimationFrame = mockCancelAnimationFrame as any;
+    (globalThis as any).AudioContext = MockAudioContext;
 
     rafCallbacks.clear();
     rafId = 0;
@@ -57,9 +57,9 @@ describe("PlaybackClock — FINDING-017: RAF Generation Counter", () => {
 
   afterEach(() => {
     // Restore originals
-    global.requestAnimationFrame = originalRAF;
-    global.cancelAnimationFrame = originalCAF;
-    (global as any).AudioContext = originalAudioContext;
+    globalThis.requestAnimationFrame = originalRAF;
+    globalThis.cancelAnimationFrame = originalCAF;
+    (globalThis as any).AudioContext = originalAudioContext;
 
     rafCallbacks.clear();
   });

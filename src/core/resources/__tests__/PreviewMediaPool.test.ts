@@ -9,7 +9,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 // Mock browser APIs for Node environment
 if (typeof HTMLVideoElement === "undefined") {
-  (global as any).HTMLVideoElement = class HTMLVideoElement {
+  (globalThis as any).HTMLVideoElement = class HTMLVideoElement {
     src = "";
     currentTime = 0;
     duration = 10;
@@ -42,14 +42,14 @@ if (typeof HTMLVideoElement === "undefined") {
 }
 
 if (typeof HTMLAudioElement === "undefined") {
-  (global as any).HTMLAudioElement = class HTMLAudioElement extends (global as any).HTMLVideoElement {};
+  (globalThis as any).HTMLAudioElement = class HTMLAudioElement extends (globalThis as any).HTMLVideoElement {};
 }
 
 if (typeof document === "undefined") {
-  (global as any).document = {
+  (globalThis as any).document = {
     createElement: (tag: string) => {
-      if (tag === "video") return new (global as any).HTMLVideoElement();
-      if (tag === "audio") return new (global as any).HTMLAudioElement();
+      if (tag === "video") return new (globalThis as any).HTMLVideoElement();
+      if (tag === "audio") return new (globalThis as any).HTMLAudioElement();
       if (tag === "div") {
         return {
           style: { cssText: "" },
@@ -79,6 +79,12 @@ function createMockClip(id: string, mediaId: string, startTime: number, duration
     trimOut: trimIn + duration,
     kind: "video",
     volume: 1.0,
+    x: 0,
+    y: 0,
+    width: 1920,
+    height: 1080,
+    opacity: 1,
+    rotation: 0,
   } as Clip;
 }
 
@@ -121,7 +127,7 @@ describe("PreviewMediaPool — Re-entrancy Protection", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     // Should not throw
@@ -146,7 +152,7 @@ describe("PreviewMediaPool — Re-entrancy Protection", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     const syncState2 = {
@@ -155,7 +161,7 @@ describe("PreviewMediaPool — Re-entrancy Protection", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     // Call sync twice rapidly
@@ -183,7 +189,7 @@ describe("PreviewMediaPool — Re-entrancy Protection", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -204,7 +210,7 @@ describe("PreviewMediaPool — Re-entrancy Protection", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     // First sync should work
@@ -229,7 +235,7 @@ describe("PreviewMediaPool — Re-entrancy Protection", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     // Start a sync
@@ -255,7 +261,7 @@ describe("PreviewMediaPool — Re-entrancy Protection", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -283,7 +289,7 @@ describe("PreviewMediaPool — Re-entrancy Protection", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -315,7 +321,7 @@ describe("PreviewMediaPool — Basic Functionality", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     pool.sync(clips, assets, tracks, syncState);
@@ -334,7 +340,7 @@ describe("PreviewMediaPool — Basic Functionality", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     expect(() => {
@@ -355,7 +361,7 @@ describe("PreviewMediaPool — Basic Functionality", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     pool.sync(clips, assets, tracks, syncState);
@@ -379,7 +385,7 @@ describe("PreviewMediaPool — Basic Functionality", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     pool.dispose();
@@ -405,7 +411,7 @@ describe("PreviewMediaPool — Basic Functionality", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     pool.sync(clips, assets, tracks, syncState);
@@ -440,7 +446,7 @@ describe("PreviewMediaPool — Split Clip Scenarios", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Simulate split: left clip keeps original ID, right clip gets new ID
@@ -456,7 +462,7 @@ describe("PreviewMediaPool — Split Clip Scenarios", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -479,7 +485,7 @@ describe("PreviewMediaPool — Split Clip Scenarios", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Simulate multiple rapid splits
@@ -490,7 +496,7 @@ describe("PreviewMediaPool — Split Clip Scenarios", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     clips = [createMockClip("clip-1", "media-1", 0, 2, 0), createMockClip("clip-2", "media-1", 2, 4, 2), createMockClip("clip-3", "media-1", 6, 4, 6)];
@@ -500,7 +506,7 @@ describe("PreviewMediaPool — Split Clip Scenarios", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -536,7 +542,7 @@ describe("PreviewMediaPool — Performance and Memory", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const endTime = Date.now();
@@ -559,7 +565,7 @@ describe("PreviewMediaPool — Performance and Memory", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -583,7 +589,7 @@ describe("PreviewMediaPool — Performance and Memory", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -617,7 +623,7 @@ describe("PreviewMediaPool — FINDING-004: Seeked Event Listener Leak", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Simulate rapid scrubbing (100 seeks in quick succession)
@@ -629,7 +635,7 @@ describe("PreviewMediaPool — FINDING-004: Seeked Event Listener Leak", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -654,7 +660,7 @@ describe("PreviewMediaPool — FINDING-004: Seeked Event Listener Leak", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -683,7 +689,7 @@ describe("PreviewMediaPool — FINDING-004: Seeked Event Listener Leak", () => {
           speed: 1.0,
           muted: false,
           volume: 100,
-          frameRate: 30,
+          frameRate: 30 as 24 | 30 | 60,
         });
       }
     }
@@ -709,7 +715,7 @@ describe("PreviewMediaPool — FINDING-004: Seeked Event Listener Leak", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -733,7 +739,7 @@ describe("PreviewMediaPool — FINDING-004: Seeked Event Listener Leak", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
 
       // Play briefly
@@ -743,7 +749,7 @@ describe("PreviewMediaPool — FINDING-004: Seeked Event Listener Leak", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
 
       // Seek again
@@ -753,7 +759,7 @@ describe("PreviewMediaPool — FINDING-004: Seeked Event Listener Leak", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -787,7 +793,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements = pool.getVideoElements();
@@ -810,7 +816,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Should create element (for preloading) but not attempt playback
@@ -834,7 +840,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -846,7 +852,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -867,7 +873,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Immediately advance past clip boundary
@@ -879,7 +885,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -902,7 +908,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -927,7 +933,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
       await wait(20);
     }
@@ -950,7 +956,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -962,7 +968,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -988,7 +994,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -1000,7 +1006,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -1012,7 +1018,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -1038,7 +1044,7 @@ describe("PreviewMediaPool — FINDING-007: Missing isActive Guard", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -1070,7 +1076,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     // First sync - should execute fully
@@ -1101,7 +1107,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Second sync at time 3.5 (changed by 1.0s)
@@ -1112,7 +1118,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Should remain functional
@@ -1131,7 +1137,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Second sync at time 2.516 (16ms later - one frame at 60fps)
@@ -1142,7 +1148,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Third sync at time 2.550 (50ms later)
@@ -1153,7 +1159,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(() => pool.getVideoElements()).not.toThrow();
@@ -1171,7 +1177,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Second sync - paused (state changed)
@@ -1182,7 +1188,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(() => pool.getVideoElements()).not.toThrow();
@@ -1199,7 +1205,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Second sync - two clips (clip count changed)
@@ -1210,7 +1216,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(() => pool.getVideoElements()).not.toThrow();
@@ -1228,7 +1234,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const startTime = performance.now();
@@ -1243,7 +1249,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -1270,7 +1276,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -1292,7 +1298,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Sync at 2.46, 2.47, 2.48, 2.49 (all round to 2.4)
@@ -1304,7 +1310,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -1316,7 +1322,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(() => pool.getVideoElements()).not.toThrow();
@@ -1333,7 +1339,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Second sync - still empty (should early exit)
@@ -1343,7 +1349,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(pool.getVideoElements().size).toBe(0);
@@ -1362,7 +1368,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -1375,7 +1381,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(() => pool.getVideoElements()).not.toThrow();
@@ -1393,7 +1399,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     pool.dispose();
@@ -1408,7 +1414,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     pool.sync(clips, assets, tracks, {
@@ -1417,7 +1423,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(() => pool.getVideoElements()).not.toThrow();
@@ -1435,7 +1441,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Dispose (should clear internal hash)
@@ -1448,7 +1454,7 @@ describe("PreviewMediaPool — FINDING-006: Early Exit Optimization", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(pool.getVideoElements().size).toBe(0);
@@ -1478,7 +1484,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements = pool.getVideoElements();
@@ -1504,7 +1510,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // The pool should work correctly without playbackState field
@@ -1523,7 +1529,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -1535,7 +1541,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Should not enter infinite retry loop
@@ -1555,7 +1561,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // State is determined by element.paused + autoplayBlocked flag
@@ -1575,7 +1581,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Rapid pause
@@ -1585,7 +1591,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Rapid play again
@@ -1595,7 +1601,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -1618,7 +1624,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -1641,7 +1647,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // While promise is in flight, try again
@@ -1651,7 +1657,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -1672,7 +1678,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements = pool.getVideoElements();
@@ -1695,7 +1701,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements = pool.getVideoElements();
@@ -1717,7 +1723,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // State derivation logic:
@@ -1742,7 +1748,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -1770,7 +1776,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
       syncCalls++;
     }
@@ -1794,7 +1800,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Immediately pause (promise might still be in flight)
@@ -1804,7 +1810,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -1828,7 +1834,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -1843,7 +1849,7 @@ describe("PreviewMediaPool — FINDING-015: State Machine Divergence Prevention"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -1877,7 +1883,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -1900,7 +1906,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -1923,7 +1929,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -1935,7 +1941,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -1959,7 +1965,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
       await wait(10);
     }
@@ -1982,7 +1988,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -2008,7 +2014,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -2031,7 +2037,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2043,7 +2049,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2055,7 +2061,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2077,7 +2083,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -2099,7 +2105,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -2121,7 +2127,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2136,7 +2142,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -2159,7 +2165,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2183,7 +2189,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -2207,7 +2213,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2219,7 +2225,7 @@ describe("PreviewMediaPool — FINDING-018: Cache Eviction Hard Limit", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2253,7 +2259,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Immediately pause (promise might still be pending)
@@ -2263,7 +2269,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2288,7 +2294,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
 
       pool.sync(clips, assets, tracks, {
@@ -2297,7 +2303,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -2322,7 +2328,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Pause immediately
@@ -2332,7 +2338,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Wait for any pending promises
@@ -2345,7 +2351,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2369,7 +2375,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     pool.sync(clips, assets, tracks, {
@@ -2378,7 +2384,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2390,7 +2396,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2411,7 +2417,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Pause while promise is resolving
@@ -2422,7 +2428,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2446,7 +2452,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     pool.sync(clips, assets, tracks, {
@@ -2455,7 +2461,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     pool.sync(clips, assets, tracks, {
@@ -2464,7 +2470,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     pool.sync(clips, assets, tracks, {
@@ -2473,7 +2479,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -2497,7 +2503,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // User clicks pause within 100ms
@@ -2508,7 +2514,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -2532,7 +2538,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     pool.sync(clips, assets, tracks, {
@@ -2541,7 +2547,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Wait for all promises to settle
@@ -2567,7 +2573,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Stop
@@ -2577,7 +2583,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(50);
@@ -2601,7 +2607,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Cancel immediately
@@ -2611,7 +2617,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -2635,7 +2641,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // User clicks pause button
@@ -2645,7 +2651,7 @@ describe("PreviewMediaPool — FINDING-016: Play Promise Cancellation", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     await wait(100);
@@ -2682,7 +2688,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements = pool.getVideoElements();
@@ -2732,6 +2738,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0, // Same speed
       muted: false, // Same muted
       volume: 100, // Same volume
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // With optimization: properties not set again (counts remain 0)
@@ -2753,7 +2760,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Change muted state
@@ -2763,7 +2770,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: true, // Changed
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements = pool.getVideoElements();
@@ -2777,6 +2784,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: true,
       volume: 50, // Changed
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Volume should be updated (roughly 0.5 since muted=true sets volume to 0)
@@ -2789,6 +2797,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: false, // Changed
       volume: 50,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Change playback rate
@@ -2798,6 +2807,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 2.0, // Changed
       muted: false,
       volume: 50,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(element.playbackRate).toBe(2.0);
@@ -2815,7 +2825,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements = pool.getVideoElements();
@@ -2862,7 +2872,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -2883,6 +2893,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: false,
       volume: 33.333333, // Repeating decimal
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements = pool.getVideoElements();
@@ -2907,6 +2918,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: false,
       volume: 33.334, // Very close to previous
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Should not update due to tolerance
@@ -2924,6 +2936,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: false,
       volume: 50,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements = pool.getVideoElements();
@@ -2948,6 +2961,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: false,
       volume: 60, // Changed by 10% = 0.1 difference
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Should update (difference > 0.01)
@@ -2965,7 +2979,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements = pool.getVideoElements();
@@ -2994,6 +3008,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
         speed: i % 2 === 0 ? 1.0 : 2.0, // Alternate speed
         muted: i % 2 === 0, // Alternate muted
         volume: i % 2 === 0 ? 100 : 50, // Alternate volume
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -3020,7 +3035,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements = pool.getVideoElements();
@@ -3037,7 +3052,7 @@ describe("PreviewMediaPool — FINDING-022: Conditional Property Updates", () =>
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const unmutedCountAfter = elements.filter((e) => !e.muted).length;
@@ -3068,7 +3083,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const videoElements1 = pool.getVideoElements();
@@ -3081,7 +3096,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Element should still exist (in grace period)
@@ -3095,7 +3110,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Element should be back and grace period extended
@@ -3123,7 +3138,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const elements1 = pool.getVideoElements();
@@ -3136,7 +3151,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Element should still be accessible with ORIGINAL clipId
@@ -3151,7 +3166,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Should have clip-2 (active in timeline)
@@ -3175,7 +3190,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(pool.getVideoElements().has("clip-original-media-1")).toBe(true);
@@ -3188,7 +3203,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const elementsAfterSplit = pool.getVideoElements();
@@ -3206,7 +3221,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const elementsAfterGrace = pool.getVideoElements();
@@ -3227,7 +3242,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Split at playhead
@@ -3237,7 +3252,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Immediately after split, ALL elements should be accessible:
@@ -3257,7 +3272,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -3278,7 +3293,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(pool.getVideoElements().has("clip-1-media-1")).toBe(true);
@@ -3290,7 +3305,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Wait for grace period to expire
@@ -3303,7 +3318,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // clip-2 should be present
@@ -3323,7 +3338,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Remove and add rapidly (simulating undo/redo or rapid edits)
@@ -3335,7 +3350,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
 
       await wait(50);
@@ -3347,7 +3362,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
@@ -3369,7 +3384,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const elements1 = pool.getVideoElements();
@@ -3384,7 +3399,7 @@ describe("PreviewMediaPool — FINDING-002 & FINDING-003: Grace Period and Origi
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const elements2 = pool.getVideoElements();
@@ -3426,7 +3441,9 @@ describe("PreviewMediaPool — FINDING-013: Cache Key Precision", () => {
       path: "/path/test.mp4",
       type: "video",
       duration: 10,
-      thumbnail: "",
+      width: 1920,
+      height: 1080,
+      size: 1000000,
     };
 
     const tracks = [{ id: "track-1", type: "video", visible: true, muted: false }];
@@ -3436,7 +3453,7 @@ describe("PreviewMediaPool — FINDING-013: Cache Key Precision", () => {
       speed: 1,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     // Clip with trimIn that should normalize to 5.123
@@ -3449,6 +3466,12 @@ describe("PreviewMediaPool — FINDING-013: Cache Key Precision", () => {
       trimIn: 5.1234999, // Math.round(5123.4999) / 1000 = 5123 / 1000 = 5.123
       trimOut: 7.1234999,
       kind: "video",
+      x: 0,
+      y: 0,
+      width: 1920,
+      height: 1080,
+      opacity: 1,
+      rotation: 0,
     };
 
     pool.sync([clip], [asset], tracks, syncState);
@@ -3465,7 +3488,9 @@ describe("PreviewMediaPool — FINDING-013: Cache Key Precision", () => {
       path: "/path/test.mp4",
       type: "video",
       duration: 10,
-      thumbnail: "",
+      width: 1920,
+      height: 1080,
+      size: 1000000,
     };
 
     const tracks = [{ id: "track-1", type: "video", visible: true, muted: false }];
@@ -3475,7 +3500,7 @@ describe("PreviewMediaPool — FINDING-013: Cache Key Precision", () => {
       speed: 1,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     const clip1: Clip = {
@@ -3487,6 +3512,12 @@ describe("PreviewMediaPool — FINDING-013: Cache Key Precision", () => {
       trimIn: 5.0,
       trimOut: 7.0,
       kind: "video",
+      x: 0,
+      y: 0,
+      width: 1920,
+      height: 1080,
+      opacity: 1,
+      rotation: 0,
     };
 
     const clip2: Clip = {
@@ -3498,6 +3529,12 @@ describe("PreviewMediaPool — FINDING-013: Cache Key Precision", () => {
       trimIn: 5.01, // 10ms different - should be separate element
       trimOut: 7.01,
       kind: "video",
+      x: 0,
+      y: 0,
+      width: 1920,
+      height: 1080,
+      opacity: 1,
+      rotation: 0,
     };
 
     pool.sync([clip1, clip2], [asset], tracks, syncState);
@@ -3516,7 +3553,9 @@ describe("PreviewMediaPool — FINDING-013: Cache Key Precision", () => {
       path: "/path/test.mp4",
       type: "video",
       duration: 10,
-      thumbnail: "",
+      width: 1920,
+      height: 1080,
+      size: 1000000,
     };
 
     const tracks = [{ id: "track-1", type: "video", visible: true, muted: false }];
@@ -3526,7 +3565,7 @@ describe("PreviewMediaPool — FINDING-013: Cache Key Precision", () => {
       speed: 1,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     };
 
     // Frame 155 at 29.97fps = 5.172172172... seconds
@@ -3542,6 +3581,12 @@ describe("PreviewMediaPool — FINDING-013: Cache Key Precision", () => {
       trimIn: frame155,
       trimOut: frame155 + 2,
       kind: "video",
+      x: 0,
+      y: 0,
+      width: 1920,
+      height: 1080,
+      opacity: 1,
+      rotation: 0,
     };
 
     pool.sync([clip], [asset], tracks, syncState);
@@ -3575,10 +3620,10 @@ describe("PreviewMediaPool — FINDING-014: Missing Seeking Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
     const element = managed.element;
 
     Object.defineProperty(element, "paused", { value: false, configurable: true });
@@ -3595,7 +3640,7 @@ describe("PreviewMediaPool — FINDING-014: Missing Seeking Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(pauseCalled).toBe(false);
@@ -3612,10 +3657,10 @@ describe("PreviewMediaPool — FINDING-014: Missing Seeking Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
     const element = managed.element;
 
     Object.defineProperty(element, "paused", { value: false, configurable: true });
@@ -3634,7 +3679,7 @@ describe("PreviewMediaPool — FINDING-014: Missing Seeking Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(pauseCalled).toBe(true);
@@ -3651,10 +3696,10 @@ describe("PreviewMediaPool — FINDING-014: Missing Seeking Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
     const element = managed.element;
 
     Object.defineProperty(element, "paused", { value: true, configurable: true });
@@ -3670,7 +3715,7 @@ describe("PreviewMediaPool — FINDING-014: Missing Seeking Guard", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(pauseCalled).toBe(false);
@@ -3700,10 +3745,10 @@ describe("PreviewMediaPool — FINDING-020: Dispose During Play Promise", () => 
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
     expect(managed.disposing).toBe(false);
 
     // Simulate play promise in flight
@@ -3727,10 +3772,10 @@ describe("PreviewMediaPool — FINDING-020: Dispose During Play Promise", () => 
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
 
     // Simulate play promise in flight
     managed.playPromiseInFlight = true;
@@ -3754,10 +3799,10 @@ describe("PreviewMediaPool — FINDING-020: Dispose During Play Promise", () => 
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
     const element = managed.element;
 
     // Setup element to pass all guards by overriding getters
@@ -3805,10 +3850,10 @@ describe("PreviewMediaPool — FINDING-020: Dispose During Play Promise", () => 
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
     const element = managed.element;
 
     // Setup element to pass all guards by overriding getters
@@ -3859,7 +3904,7 @@ describe("PreviewMediaPool — FINDING-020: Dispose During Play Promise", () => 
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Verify element exists
@@ -3896,10 +3941,10 @@ describe("PreviewMediaPool — FINDING-019: RVFC Closure Memory Leak", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
     const initialGeneration = managed.rvfcGeneration;
 
     // Trigger re-registration by updating element state
@@ -3925,10 +3970,10 @@ describe("PreviewMediaPool — FINDING-019: RVFC Closure Memory Leak", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
     const initialGeneration = managed.rvfcGeneration;
 
     // Dispose the pool
@@ -3949,10 +3994,10 @@ describe("PreviewMediaPool — FINDING-019: RVFC Closure Memory Leak", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
     const oldGeneration = managed.rvfcGeneration;
 
     // Register new RVFC (increments generation)
@@ -3975,11 +4020,11 @@ describe("PreviewMediaPool — FINDING-019: RVFC Closure Memory Leak", () => {
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
     const generationBeforeDispose = managed.rvfcGeneration;
 
     // Dispose should increment generation, invalidating all pending callbacks
@@ -3999,10 +4044,10 @@ describe("PreviewMediaPool — FINDING-019: RVFC Closure Memory Leak", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
 
     // Simulate rapid re-registration (like during playback state changes)
     const generations: number[] = [];
@@ -4031,10 +4076,10 @@ describe("PreviewMediaPool — FINDING-019: RVFC Closure Memory Leak", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
 
     // New element should start with generation 0
     expect(managed.rvfcGeneration).toBeGreaterThanOrEqual(0);
@@ -4053,7 +4098,7 @@ describe("PreviewMediaPool — FINDING-019: RVFC Closure Memory Leak", () => {
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Get all managed elements
@@ -4138,7 +4183,7 @@ describe("PreviewMediaPool — FINDING-005: Frame-Rate-Aware Boundary Tolerance"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     expect(pool.getVideoElements().size).toBe(1);
@@ -4151,11 +4196,11 @@ describe("PreviewMediaPool — FINDING-005: Frame-Rate-Aware Boundary Tolerance"
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Element should be marked inactive (but still cached)
-    const managed = Array.from((pool as any).videoCache.values())[0];
+    const managed = Array.from((pool as any).videoCache.values())[0] as any;
     expect(managed.isActive).toBe(false);
   });
 
@@ -4210,7 +4255,7 @@ describe("PreviewMediaPool — FINDING-008: Memory-Aware Adaptive Eviction", () 
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Should have created elements
@@ -4223,7 +4268,7 @@ describe("PreviewMediaPool — FINDING-008: Memory-Aware Adaptive Eviction", () 
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Elements should still exist (not old enough for 60s eviction)
@@ -4244,7 +4289,7 @@ describe("PreviewMediaPool — FINDING-008: Memory-Aware Adaptive Eviction", () 
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const initialCacheSize = (pool as any).videoCache.size;
@@ -4265,7 +4310,7 @@ describe("PreviewMediaPool — FINDING-008: Memory-Aware Adaptive Eviction", () 
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Should have evicted old elements due to memory pressure
@@ -4286,7 +4331,7 @@ describe("PreviewMediaPool — FINDING-008: Memory-Aware Adaptive Eviction", () 
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     const initialCacheSize = (pool as any).videoCache.size;
@@ -4307,7 +4352,7 @@ describe("PreviewMediaPool — FINDING-008: Memory-Aware Adaptive Eviction", () 
       speed: 1.0,
       muted: false,
       volume: 100,
-      frameRate: 30,
+      frameRate: 30 as 24 | 30 | 60,
     });
 
     // Should have aggressively evicted due to hard limit
@@ -4330,7 +4375,7 @@ describe("PreviewMediaPool — FINDING-008: Memory-Aware Adaptive Eviction", () 
         speed: 1.0,
         muted: false,
         volume: 100,
-        frameRate: 30,
+        frameRate: 30 as 24 | 30 | 60,
       });
     }
 
