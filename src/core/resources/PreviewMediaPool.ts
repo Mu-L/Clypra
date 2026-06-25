@@ -494,6 +494,7 @@ export class PreviewMediaPool {
       const now = performance.now();
 
       for (const [cacheKey, managed] of this.videoCache) {
+        const isActive = activeCacheKeys.has(cacheKey);
         const isInGracePeriod = now < managed.registrationGraceUntil;
         const isInTimeline = timelineCacheKeys.has(cacheKey);
         const recentRemoval = this.recentlyRemovedClips.get(cacheKey);
@@ -506,6 +507,13 @@ export class PreviewMediaPool {
           if (!managed.element.paused) {
             managed.element.pause();
           }
+        }
+
+        // CRITICAL FIX: Elements in grace period during PLAYING must also be paused if not active
+        // This prevents audio bleed when seeking backwards during playback
+        if (isInTransitionGrace && syncState.state === "playing" && !isActive && !managed.element.paused) {
+          console.log(`⏸️  [Audio Debug] Pausing grace-period element during seek: ${managed.clipId.substring(0, 25)}... (not active at t=${syncState.time.toFixed(2)}s)`);
+          managed.element.pause();
         }
 
         // Only mark as orphaned if NOT in timeline AND NOT in transition grace AND past registration grace

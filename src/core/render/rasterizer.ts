@@ -511,20 +511,12 @@ async function rasterizeMediaLayer(ctx: CanvasRenderingContext2D | OffscreenCanv
 
       if (video) {
         if (video.readyState >= 2) {
-          // HAVE_CURRENT_DATA — element is loaded, draw it
-          // Apply source rotation BEFORE drawing (critical for export)
           performanceMonitor.increment("rasterizer.video_element_hit");
-
-          // LOG SUCCESS: Video element found (especially important for split clips during transitions)
-          if (layer.clipId.includes("split") || layer.clipId.match(/clip-\d+-\w+-\d+/)) {
-            console.log(`[Rasterizer] ✅ Video element found for clip ${layer.clipId} (key: ${key})`);
-          }
 
           await drawMediaWithSourceRotation(ctx, video, width, height, layer.sourceRotation, layer.effects, layer.filter);
           performanceMonitor.endTimer(`rasterizer.media_${layer.mediaType}`);
           return;
         }
-        // Element exists but still loading — draw silent placeholder (no error)
         performanceMonitor.increment("rasterizer.video_element_loading");
         drawLoadingPlaceholder(ctx, width, height);
         performanceMonitor.endTimer(`rasterizer.media_${layer.mediaType}`);
