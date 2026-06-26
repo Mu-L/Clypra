@@ -147,6 +147,19 @@ export async function resetAllProjectState(options: ResetOptions = {}): Promise<
     }
   }
 
+    // Reset auto-save middleware suspension (BUG-006 fix)
+    // If a project was closed mid-drag, _suspended may be permanently true
+    try {
+      const { resumeAutoSave } = await import("@/store/middleware/autoSaveMiddleware");
+      resumeAutoSave();
+
+      resetSubsystems.push("AutoSaveMiddleware");
+      console.log("  ✅ AutoSaveMiddleware suspension reset");
+    } catch (error) {
+      errors.push({ subsystem: "AutoSaveMiddleware", error: error as Error });
+      console.error("  ❌ AutoSaveMiddleware reset failed:", error);
+    }
+
   if (opts.resetTransform) {
     try {
       const { resetTransformController } = await import("@/core/interactions");
@@ -243,6 +256,21 @@ export async function resetAllProjectState(options: ResetOptions = {}): Promise<
       errors.push({ subsystem: "PerformanceMonitor", error: error as Error });
       console.error("  ❌ PerformanceMonitor reset failed:", error);
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // PHASE 5b: Reset Resource Cache (BUG-003 fix)
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  try {
+    const { resetResourceCache } = await import("../resources/ResourceCache");
+    resetResourceCache();
+
+    resetSubsystems.push("ResourceCache");
+    console.log("  ✅ ResourceCache reset (ImageBitmaps released)");
+  } catch (error) {
+    errors.push({ subsystem: "ResourceCache", error: error as Error });
+    console.error("  ❌ ResourceCache reset failed:", error);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════════
