@@ -490,6 +490,7 @@ class SessionRegistry {
   private _activeSession: ProjectSession | null = null;
   private _listeners = new Set<SessionRegistryListener>();
   private _currentRequestId = 0;
+  private _targetProjectId: string | null = null;
 
   /**
    * Get active session (if any).
@@ -499,11 +500,31 @@ class SessionRegistry {
   }
 
   /**
+   * Set target project ID.
+   */
+  setTargetProjectId(projectId: string | null): void {
+    this._targetProjectId = projectId;
+  }
+
+  /**
+   * Get target project ID.
+   */
+  getTargetProjectId(): string | null {
+    return this._targetProjectId;
+  }
+
+  /**
    * Set active session.
    * Automatically disposes previous session if exists.
    */
   async setActiveSession(session: ProjectSession | null): Promise<void> {
     const requestId = ++this._currentRequestId;
+
+    if (session && session.projectId !== this._targetProjectId) {
+      console.warn(`[SessionRegistry] Session switch discarded: session project ${session.projectId} does not match target project ${this._targetProjectId}. Disposing session.`);
+      await session.dispose();
+      return;
+    }
 
     if (this._activeSession && this._activeSession !== session) {
       const oldSession = this._activeSession;
@@ -603,8 +624,17 @@ export async function createProjectSession(projectId: string): Promise<ProjectSe
 
   lifecycleMonitor.record("PROJECT_LOAD_START", { projectId });
 
+  sessionRegistry.setTargetProjectId(projectId);
+
   const session = new ProjectSession(projectId);
-  await session.initialize();
+  try {
+    await session.initialize();
+  } catch (err) {
+    if (sessionRegistry.getTargetProjectId() === projectId) {
+      sessionRegistry.setTargetProjectId(null);
+    }
+    throw err;
+  }
   await sessionRegistry.setActiveSession(session);
 
   lifecycleMonitor.record("PROJECT_LOAD_COMPLETE", { projectId, sessionId: session.sessionId });
@@ -616,5 +646,6 @@ export async function createProjectSession(projectId: string): Promise<ProjectSe
  * Dispose active project session.
  */
 export async function disposeActiveSession(): Promise<void> {
+  sessionRegistry.setTargetProjectId(null);
   await sessionRegistry.clearActiveSession();
 }
