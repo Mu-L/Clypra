@@ -189,6 +189,7 @@ export async function resetAllProjectState(options: ResetOptions = {}): Promise<
         previewMediaId: null,
         activePanel: "media",
         showExportModal: false,
+        showNewProjectModal: false, // SC-BUG-006 fix
         showSettingsModal: false,
         previewMode: "program",
         sourceAsset: null,
@@ -237,6 +238,28 @@ export async function resetAllProjectState(options: ResetOptions = {}): Promise<
     }
   }
 
+  // Reset TemplateStore (SC-BUG-002 fix)
+  try {
+    const { useTemplateStore } = await import("@/features/text-templates/templateStore");
+    useTemplateStore.getState().reset();
+    resetSubsystems.push("TemplateStore");
+    console.log("  ✅ TemplateStore reset");
+  } catch (error) {
+    errors.push({ subsystem: "TemplateStore", error: error as Error });
+    console.error("  ❌ TemplateStore reset failed:", error);
+  }
+
+  // Reset FavoritesStore (SC-HIDDEN-002 / Q2 fix)
+  try {
+    const { useFavoritesStore } = await import("@/store/favoritesStore");
+    useFavoritesStore.setState({ downloadingIds: [] });
+    resetSubsystems.push("FavoritesStore");
+    console.log("  ✅ FavoritesStore active downloads reset");
+  } catch (error) {
+    errors.push({ subsystem: "FavoritesStore", error: error as Error });
+    console.error("  ❌ FavoritesStore reset failed:", error);
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════════
   // PHASE 5: Reset Monitoring/Debugging
   // ═══════════════════════════════════════════════════════════════════════════════
@@ -271,6 +294,17 @@ export async function resetAllProjectState(options: ResetOptions = {}): Promise<
   } catch (error) {
     errors.push({ subsystem: "ResourceCache", error: error as Error });
     console.error("  ❌ ResourceCache reset failed:", error);
+  }
+
+  // Clear BodyMaskCache (SC-BUG-004 fix)
+  try {
+    const { bodyMaskCache } = await import("@/features/body-effects/segmentation/maskCache");
+    bodyMaskCache.clear();
+    resetSubsystems.push("BodyMaskCache");
+    console.log("  ✅ BodyMaskCache cleared");
+  } catch (error) {
+    errors.push({ subsystem: "BodyMaskCache", error: error as Error });
+    console.error("  ❌ BodyMaskCache clear failed:", error);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════════

@@ -298,6 +298,11 @@ export const useTimelineStore = create<TimelineStore>(
         pixelsPerSecond: TIMELINE_ZOOM_DEFAULT * TIMELINE_PPS_PER_ZOOM,
         epoch: 0, // Reset epoch on project load
         mainVideoTrackId: newMainVideoTrackId,
+        snapGuides: [],
+        rippleEditEnabled: false,
+        snapEnabled: true,
+        _batchDepth: 0,
+        _pendingEpochIncrement: false,
       });
 
       performanceMonitor.endMeasure("timeline-hydrate");

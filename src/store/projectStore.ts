@@ -61,6 +61,7 @@ const graphemeSegmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
 
 // ✅ FIX-005: Load mutex to prevent concurrent project loads
 let loadInProgress: Promise<void> | null = null;
+let currentLoadId = 0;
 
 const countGraphemes = (str: string): number => {
   return Array.from(graphemeSegmenter.segment(str)).length;
@@ -272,10 +273,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   loadProject: async (project, payload) => {
+    const loadId = ++currentLoadId;
+
     // ✅ FIX-005: Wait for previous load to complete to prevent concurrent load races
     if (loadInProgress) {
       console.log("[PROJECT STORE] Waiting for previous load to complete...");
       await loadInProgress;
+    }
+
+    // Check if we were superceded while waiting for the previous load
+    if (loadId !== currentLoadId) {
+      console.log("[PROJECT STORE] Load request superceded before starting:", project.name);
+      return;
     }
 
     // Wrap load logic in a promise we can track
@@ -294,6 +303,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
           console.error("  ❌ Previous session disposal failed:", err);
         }
 
+        if (currentLoadId !== loadId) return;
+
         // Reset all project-scoped state BEFORE loading new project
         try {
           const { resetAllProjectState } = await import("@/core/runtime/ProjectStateReset");
@@ -306,6 +317,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
           console.error("❌ [PROJECT STORE] State reset failed:", err);
         }
 
+        if (currentLoadId !== loadId) return;
+
         // ═══════════════════════════════════════════════════════════════════════════════
         // PHASE 2: Load Project & Media Assets
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -313,6 +326,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         console.log("  ✅ Project and media assets loaded");
 
         await preloadTextEffectDefinitionsFromClips(payload?.clips);
+        if (currentLoadId !== loadId) return;
 
         // Preload text templates and their fonts with persistent caching
         try {
@@ -321,6 +335,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         } catch (err) {
           // Preload failed silently
         }
+
+        if (currentLoadId !== loadId) return;
 
         // ═══════════════════════════════════════════════════════════════════════════════
         // PHASE 3: Hydrate Timeline State
@@ -341,6 +357,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
           import("./timelineStore").then(({ useTimelineStore }) => useTimelineStore.getState().hydrateFromProject({ tracks: [], clips: [], transitions: [], gaps: [] })).catch(() => {});
         }
 
+        if (currentLoadId !== loadId) return;
+
         // ═══════════════════════════════════════════════════════════════════════════════
         // PHASE 4: Initialize New Runtime Session
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -351,6 +369,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         } catch (err) {
           console.error("  ❌ Session initialization failed:", err);
         }
+
+        if (currentLoadId !== loadId) return;
 
         // ═══════════════════════════════════════════════════════════════════════════════
         // PHASE 5: Prewarm Video Decoders (Background)
@@ -475,6 +495,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   closeProject: async () => {
     console.log("🏠 [PROJECT STORE] Closing project...");
+    currentLoadId++; // Cancel any active load
 
     // Ensure any pending auto-save completes before closing
     if (autoSaveTimer) {

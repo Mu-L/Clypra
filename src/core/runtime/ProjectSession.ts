@@ -489,6 +489,7 @@ export class ProjectSession {
 class SessionRegistry {
   private _activeSession: ProjectSession | null = null;
   private _listeners = new Set<SessionRegistryListener>();
+  private _currentRequestId = 0;
 
   /**
    * Get active session (if any).
@@ -502,6 +503,8 @@ class SessionRegistry {
    * Automatically disposes previous session if exists.
    */
   async setActiveSession(session: ProjectSession | null): Promise<void> {
+    const requestId = ++this._currentRequestId;
+
     if (this._activeSession && this._activeSession !== session) {
       const oldSession = this._activeSession;
       this._activeSession = null;
@@ -511,11 +514,20 @@ class SessionRegistry {
       this._notifyListeners();
       await oldSession.dispose();
     }
-    this._activeSession = session;
-    if (typeof globalThis !== "undefined") {
-      (globalThis as any).__activeProjectSession = session;
+
+    // Only set the session if this request has not been superceded by a newer switch
+    if (requestId === this._currentRequestId) {
+      this._activeSession = session;
+      if (typeof globalThis !== "undefined") {
+        (globalThis as any).__activeProjectSession = session;
+      }
+      this._notifyListeners();
+    } else {
+      console.warn(`[SessionRegistry] Session switch superceded (request ${requestId} vs current ${this._currentRequestId}). Disposing orphaned session.`);
+      if (session) {
+        await session.dispose();
+      }
     }
-    this._notifyListeners();
   }
 
   /**
