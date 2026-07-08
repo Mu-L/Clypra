@@ -451,7 +451,7 @@ export class PreviewMediaPool {
           // FINDING-025: Pass active video clip count for multi-clip audio-friendly sync
           const activeVideoClipCount = activeVisibleVideoClips.length;
 
-          this.updateVideoElement(managed, clip, syncState, tracks, isPrimaryAudibleVideo, isTrackMuted, activeVideoClipCount);
+          this.updateVideoElement(managed, clip, syncState, tracks, isPrimaryAudibleVideo, isTrackMuted, activeVideoClipCount, activeTransitions);
         } else {
           // Inactive element: pause but don't dispose
           // CRITICAL: Also update audio routing so element is ready when it becomes active
@@ -1060,9 +1060,9 @@ export class PreviewMediaPool {
     this.videoCache.delete(key);
   }
 
-  private updateVideoElement(managed: ManagedVideo, clip: Clip, syncState: PreviewSyncState, tracks: Array<{ id: string; type: string }>, isPrimaryAudibleVideo: boolean, isTrackMuted: boolean, activeVideoClipCount: number = 1): void {
+  private updateVideoElement(managed: ManagedVideo, clip: Clip, syncState: PreviewSyncState, tracks: Array<{ id: string; type: string }>, isPrimaryAudibleVideo: boolean, isTrackMuted: boolean, activeVideoClipCount: number = 1, transitions: any[] = []): void {
     const video = managed.element;
-    const sourceTime = getClipSourceTime(clip, syncState.time, syncState.frameRate);
+    const sourceTime = getClipSourceTime(clip, syncState.time, syncState.frameRate, transitions);
 
     // Combine global preview volume with per-clip volume
     const clipVolume = clip.volume ?? 1.0;
