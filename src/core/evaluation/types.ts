@@ -121,6 +121,16 @@ export interface EvaluatedMediaLayer extends BaseVisualLayer {
 
   /** Active color filter on this layer */
   readonly filter?: { id: string; name: string; intensity: number };
+
+  /** Layout parameters for the clip fitting/cropping/transforming */
+  readonly layout?: any;
+
+  /** Professional conform settings */
+  readonly conform?: import("@clypra/engine").ClipConform;
+
+  /** Dimensions of the original source media file */
+  readonly sourceWidth?: number;
+  readonly sourceHeight?: number;
 }
 
 /**
