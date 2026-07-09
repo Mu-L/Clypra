@@ -1014,7 +1014,8 @@ export class PreviewMediaPool {
       }
     });
 
-    video.src = sourcePath;
+    const separator = sourcePath.includes("?") ? "&" : "?";
+    video.src = `${sourcePath}${separator}clipId=${clipId}`;
 
     // Explicitly trigger video load
     video.load();
@@ -1637,7 +1638,8 @@ export class PreviewMediaPool {
       { once: true },
     );
 
-    audio.src = sourcePath;
+    const separator = sourcePath.includes("?") ? "&" : "?";
+    audio.src = `${sourcePath}${separator}clipId=${clipId}`;
     this.container.appendChild(audio);
     this.audios.set(key, managed);
 
