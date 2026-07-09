@@ -335,7 +335,7 @@ export const SourcePreview: React.FC = () => {
       // This ensures the rasterizer will find the cached definition when rendering the clip.
       const styleId = preset.presetType === "effect" ? preset.id : undefined;
 
-      // FIX (FINDING-016): Verify effect definition is loaded before creating clip
+      // Verify effect definition is loaded before creating clip
       // Get the effect definition for accurate bounding box calculation
       const effectDefinition = styleId ? useEffectsStore.getState().definitions[styleId] : undefined;
 

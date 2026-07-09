@@ -5,7 +5,7 @@ import { computeClipVersion } from "@/core/evaluation/cache";
 export const PREVIEW_MEDIA_LOOKAHEAD_SECONDS = 1.5;
 export const PREVIEW_MEDIA_RETENTION_SECONDS = 0.25;
 
-// ─── FINDING-010: Memoize clip filtering ─────────────────────────────────────
+// ─── Memoize clip filtering ─────────────────────────────────────
 // This function is called 60fps during playback, but results only change when
 // clock crosses clip boundaries (rare - maybe 1-10 times/sec).
 // Cache results keyed by rounded time + clip count + clip version hash to avoid repeated filtering and invalidation bugs.
@@ -28,7 +28,7 @@ export function getPreviewMediaSyncClips(clips: Clip[], time: number, transition
     const isCurrent = clip.startTime <= time && time < clipEnd;
     const isUpcoming = clip.startTime > time && clip.startTime <= time + PREVIEW_MEDIA_LOOKAHEAD_SECONDS;
     const isRecentlyEnded = clipEnd <= time && clipEnd >= time - PREVIEW_MEDIA_RETENTION_SECONDS;
-    
+
     // Include clips that are actively in a transition window at the current time
     const isInTransition = transitions.some((t) => {
       const start = t.placement.startTime;

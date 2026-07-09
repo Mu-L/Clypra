@@ -473,7 +473,7 @@ export const ComplexProgramPreview: React.FC = () => {
       const playbackState = state.clock.state;
       const isPlaying = playbackState === "playing";
 
-      // FINDING-023 / Playhead Pause Jump Fix:
+      // Playhead Pause Jump Fix:
       // Always round time to the project's actual frame rate precision to ensure
       // frame-accurate synchronization and prevent jumps when pausing.
       const frameRate = state.project?.frameRate ?? 30;
