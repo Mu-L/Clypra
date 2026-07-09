@@ -31,7 +31,6 @@ import { resolveClipSourceTime } from "../timeline/sourceTime";
 import { calculateTextAnimationState } from "@/lib/text/textAnimation";
 import { normalizeFilterIntensity } from "../render/filterIR";
 import { useEffectsStore } from "@/features/text-effects/store/effectsStore";
-import { textRenderTrace } from "@/lib/debug/textRenderTrace";
 
 /**
  * Evaluate the NLE timeline at a specific time.
@@ -141,22 +140,7 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
       const transitionState = evaluateTransitionState(clip, transitionWindows);
 
       const styleDefinition = textClip.styleId ? (useEffectsStore.getState().definitions[textClip.styleId] ?? textClip.styleDefinition) : textClip.styleDefinition;
-      textRenderTrace("text-evaluate-layer", {
-        clipId: clip.id,
-        evalTime,
-        startTime: clip.startTime,
-        duration: clip.duration,
-        offset,
-        trackId: clip.trackId,
-        role: clip.role,
-        trackIndex: clip.trackIndex,
-        contentBounds: { x: clip.x, y: clip.y, width: clip.width, height: clip.height, opacity: clip.opacity },
-        styleId: textClip.styleId,
-        hasStoreDefinition: !!(textClip.styleId && useEffectsStore.getState().definitions[textClip.styleId]),
-        hasEmbeddedDefinition: !!textClip.styleDefinition,
-        resolvedDefinitionId: styleDefinition?.id,
-        text: textClip.text,
-      });
+
       const evalFontSize = kf.fontSize !== undefined ? evaluateProperty(kf.fontSize, offset, clip.duration) : textClip.fontSize || 48;
       const evalColor = kf.color !== undefined ? evaluateProperty(kf.color, offset, clip.duration) : textClip.color || "#ffffff";
       const evalLetterSpacing = kf.letterSpacing !== undefined ? evaluateProperty(kf.letterSpacing, offset, clip.duration) : (textClip.letterSpacing ?? styleDefinition?.font?.letterSpacing ?? 0);
@@ -216,18 +200,7 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
       };
 
       visualLayers.push(textLayer);
-      textRenderTrace("text-evaluate-layer", {
-        clipId: textLayer.clipId,
-        layerId: textLayer.layerId,
-        zIndex: textLayer.zIndex,
-        contentBounds: { x: textLayer.x, y: textLayer.y, width: textLayer.width, height: textLayer.height },
-        opacity: textLayer.opacity,
-        fontFamily: textLayer.fontFamily,
-        fontSize: textLayer.fontSize,
-        fontWeight: textLayer.fontWeight,
-        styleId: textLayer.styleId,
-        hasStyleDefinition: !!textLayer.styleDefinition,
-      });
+
       continue;
     }
 
@@ -376,9 +349,7 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
         intensity: normalizeFilterIntensity((activeFilterClip as any).intensity),
         swatch: (activeFilterClip as any).swatch || "",
         pipeline: (activeFilterClip as any).pipeline as "v2" | undefined,
-        effectStack: (activeFilterClip as any).effectStack as
-          | Array<{ type: string; params?: Record<string, unknown> }>
-          | undefined,
+        effectStack: (activeFilterClip as any).effectStack as Array<{ type: string; params?: Record<string, unknown> }> | undefined,
       }
     : undefined;
 

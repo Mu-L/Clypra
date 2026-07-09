@@ -1,25 +1,12 @@
 import type { EvaluatedTextLayer } from "../evaluation/types";
-import {
-  evaluateScene as engineEvaluateScene,
-  textEffectConfigToScene,
-  type TextEffectConfig,
-  layerToTextEffectConfig,
-  CanvasDevice,
-  defaultConfig as engineDefaultConfig,
-  _buildConfig,
-} from "@clypra/engine";
+import { evaluateScene as engineEvaluateScene, textEffectConfigToScene, type TextEffectConfig, layerToTextEffectConfig, CanvasDevice, defaultConfig as engineDefaultConfig, _buildConfig } from "@clypra/engine";
 import { useEffectsStore } from "../../features/text-effects/store/effectsStore";
 import { invalidateEvaluationCache } from "../evaluation/evaluator";
 import { useTimelineStore } from "../../store/timelineStore";
 import { effectBleed } from "../../lib/text/textClip";
-import { sampleCanvasAlpha, textRenderTrace, textRenderWarn } from "@/lib/debug/textRenderTrace";
 import { performanceMonitor } from "@/lib/monitoring/PerformanceMonitor";
 
-function hasVisibleAlpha(
-  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  width: number,
-  height: number,
-): boolean | null {
+function hasVisibleAlpha(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, width: number, height: number): boolean | null {
   try {
     const sampleWidth = Math.max(1, Math.floor(width));
     const sampleHeight = Math.max(1, Math.floor(height));
@@ -36,14 +23,7 @@ function hasVisibleAlpha(
   }
 }
 
-function buildPlainTextEffectConfig(
-  layer: EvaluatedTextLayer,
-  offW: number,
-  offH: number,
-  fontSize: number,
-  scaleX: number,
-  scaleY: number,
-): TextEffectConfig {
+function buildPlainTextEffectConfig(layer: EvaluatedTextLayer, offW: number, offH: number, fontSize: number, scaleX: number, scaleY: number): TextEffectConfig {
   const plainConfig = layerToTextEffectConfig(layer);
   return {
     ...plainConfig,
@@ -77,14 +57,7 @@ function buildPlainTextEffectConfig(
  * Plain text layers (no styleId) use a minimal Canvas 2D path that
  * respects the same baseline alignment as the engine (fontSize * 0.82).
  */
-export async function rasterizeTextLayer(
-  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  layer: EvaluatedTextLayer,
-  width: number,
-  height: number,
-  scaleX: number,
-  scaleY: number,
-): Promise<void> {
+export async function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, layer: EvaluatedTextLayer, width: number, height: number, scaleX: number, scaleY: number): Promise<void> {
   performanceMonitor.startTimer("rasterizer.text_layer");
   performanceMonitor.increment("rasterizer.text_renders");
 
@@ -269,29 +242,6 @@ export async function rasterizeTextLayer(
   const unscaledOffW = Math.max(1, Math.ceil(safeWidth + unscaledPaddingX * 2));
   const unscaledOffH = Math.max(1, Math.ceil(safeHeight + unscaledPaddingY * 2));
 
-  textRenderTrace("text-raster-bounds", {
-    clipId: layer.clipId,
-    layerId: layer.layerId,
-    text: layer.text,
-    styleId: layer.styleId,
-    hasLayerStyleDefinition: !!layer.styleDefinition,
-    hasStoreDefinition: !!(layer.styleId && useEffectsStore.getState().definitions[layer.styleId]),
-    resolvedDefinitionId: effectDef?.id,
-    contentBounds: { x: layer.x, y: layer.y, width: layer.width, height: layer.height, opacity: layer.opacity },
-    fontSize,
-    unscaledFontSize,
-    renderBleed: declaredBleed,
-    scaledRenderPadding: { x: effectPaddingX, y: effectPaddingY },
-    renderBounds: { width: offW, height: offH, scaleX, scaleY },
-    unscaledRenderBounds: { width: unscaledOffW, height: unscaledOffH },
-    drawDestination: {
-      x: -width / 2 - effectPaddingX,
-      y: -height / 2 - effectPaddingY,
-      width: offW,
-      height: offH,
-    },
-  });
-
   let engineConfig: TextEffectConfig;
 
   if (layer.styleId) {
@@ -365,31 +315,6 @@ export async function rasterizeTextLayer(
     engineConfig = buildPlainTextEffectConfig(layer, unscaledOffW, unscaledOffH, unscaledFontSize, 1.0, 1.0);
   }
 
-  textRenderTrace("rasterize-text-config", {
-    clipId: layer.clipId,
-    styleId: layer.styleId,
-    text: engineConfig.text,
-    fontFamily: engineConfig.fontFamily,
-    fontSize: engineConfig.fontSize,
-    fontWeight: engineConfig.fontWeight,
-    fontStyle: engineConfig.fontStyle,
-    canvasWidth: engineConfig.canvasWidth,
-    canvasHeight: engineConfig.canvasHeight,
-    textPosX: (engineConfig as any).textPosX,
-    textPosY: (engineConfig as any).textPosY,
-    fillType: (engineConfig as any).fillType,
-    strokeEnabled: (engineConfig as any).strokeEnabled,
-    glowLayers: (engineConfig as any).glowLayers,
-    panelEnabled: (engineConfig as any).panelEnabled,
-    panelColor: (engineConfig as any).panelColor,
-    panelOpacity: (engineConfig as any).panelOpacity,
-    panelRadius: (engineConfig as any).panelRadius,
-    panelPaddingX: (engineConfig as any).panelPaddingX,
-    panelPaddingY: (engineConfig as any).panelPaddingY,
-    panelStrokeEnabled: (engineConfig as any).panelStrokeEnabled,
-    panelStrokeWidth: (engineConfig as any).panelStrokeWidth,
-    layerBackground: layer.background,
-  });
   const sceneDoc = textEffectConfigToScene(engineConfig);
 
   // Acquire canvas context from the unified CanvasDevice pool
@@ -405,48 +330,14 @@ export async function rasterizeTextLayer(
     offCtx.clearRect(0, 0, unscaledOffW, unscaledOffH);
 
     engineEvaluateScene(sceneDoc, layer.time ?? 0, offCtx as unknown as CanvasRenderingContext2D);
-    const alpha = sampleCanvasAlpha(offCtx, unscaledOffW, unscaledOffH);
-    const alphaLayerBounds = alpha?.bounds
-      ? {
-          x: alpha.bounds.x - unscaledPaddingX,
-          y: alpha.bounds.y - unscaledPaddingY,
-          width: alpha.bounds.width,
-          height: alpha.bounds.height,
-          overflowsContent: alpha.bounds.x < unscaledPaddingX || alpha.bounds.y < unscaledPaddingY || alpha.bounds.x + alpha.bounds.width > unscaledPaddingX + safeWidth || alpha.bounds.y + alpha.bounds.height > unscaledPaddingY + safeHeight,
-        }
-      : null;
-    textRenderTrace("text-raster-bounds", {
-      clipId: layer.clipId,
-      styleId: layer.styleId,
-      contentBounds: { x: layer.x, y: layer.y, width: layer.width, height: layer.height },
-      unscaledRenderBounds: { width: unscaledOffW, height: unscaledOffH },
-      unscaledRenderPadding: { x: unscaledPaddingX, y: unscaledPaddingY },
-      alpha,
-      alphaLayerBounds,
-    });
+
     const visibleAlpha = hasVisibleAlpha(offCtx, unscaledOffW, unscaledOffH);
-    if (alpha && alpha.visiblePixels === 0) {
-      textRenderWarn("rasterize-text-blank-offscreen", {
-        clipId: layer.clipId,
-        styleId: layer.styleId,
-        text: layer.text,
-        fontFamily: engineConfig.fontFamily,
-        fontSize: engineConfig.fontSize,
-        offscreen: { width: unscaledOffW, height: unscaledOffH },
-        hasEffectDef: !!effectDef,
-      });
-    }
+
     if (layer.styleId && visibleAlpha === false) {
       const fallbackConfig = buildPlainTextEffectConfig(layer, unscaledOffW, unscaledOffH, unscaledFontSize, 1.0, 1.0);
       const fallbackSceneDoc = textEffectConfigToScene(fallbackConfig);
       offCtx.clearRect(0, 0, unscaledOffW, unscaledOffH);
       engineEvaluateScene(fallbackSceneDoc, layer.time ?? 0, offCtx as unknown as CanvasRenderingContext2D);
-      textRenderWarn("rasterize-text-effect-fallback", {
-        clipId: layer.clipId,
-        styleId: layer.styleId,
-        text: layer.text,
-        reason: "styled effect rendered no visible pixels",
-      });
     }
     // Draw the unscaled offscreen canvas scaled down to the preview resolution.
     // Source rect: full unscaled canvas
@@ -476,13 +367,7 @@ export async function rasterizeTextLayer(
 /**
  * Measure text dimensions (for layout validation).
  */
-export function measureText(
-  text: string,
-  fontFamily: string,
-  fontSize: number,
-  fontWeight: string | number,
-  fontStyle: string,
-): { width: number; height: number } {
+export function measureText(text: string, fontFamily: string, fontSize: number, fontWeight: string | number, fontStyle: string): { width: number; height: number } {
   // Create temporary canvas for measurement
   const canvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(1, 1) : document.createElement("canvas");
 

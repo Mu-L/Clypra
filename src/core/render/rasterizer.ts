@@ -26,7 +26,6 @@ import { effectBleed } from "../../lib/text/textClip";
 import lottie from "lottie-web";
 import { useStickersStore } from "../../features/stickers/store/stickersStore";
 import { segmentBodyMask } from "../../features/body-effects/segmentation/bodySegmentationWorkerClient";
-import { sampleCanvasAlpha, textRenderTrace, textRenderWarn } from "@/lib/debug/textRenderTrace";
 import { performanceMonitor } from "@/lib/monitoring/PerformanceMonitor";
 import { TransitionRenderer } from "@clypra/engine/transitions";
 
@@ -360,13 +359,7 @@ export async function rasterizeScene(scene: EvaluatedScene, target: RasterTarget
           intensity,
         );
         if (isV2SupportedEffectStack(scaled)) {
-          const manifest = buildManifestFromClip(
-            "filter-post",
-            "Filter Post Process",
-            { id: "filter-clip", assetId: "filter-source", timelineStartMs: 0, timelineEndMs: 60_000, enabled: true },
-            scaled,
-            { width: targetWidth, height: targetHeight, assetUri: "inline://filter", assetKind: "image" },
-          );
+          const manifest = buildManifestFromClip("filter-post", "Filter Post Process", { id: "filter-clip", assetId: "filter-source", timelineStartMs: 0, timelineEndMs: 60_000, enabled: true }, scaled, { width: targetWidth, height: targetHeight, assetUri: "inline://filter", assetKind: "image" });
 
           const sourceCanvas = document.createElement("canvas");
           sourceCanvas.width = targetWidth;
@@ -778,10 +771,7 @@ async function renderMediaFrame(source: HTMLVideoElement | ImageBitmap | HTMLCan
           { width: w, height: h, assetUri: "inline://source", assetKind: "image" },
         );
 
-        const sourceEl =
-          source instanceof HTMLVideoElement || source instanceof HTMLCanvasElement
-            ? source
-            : await imageBitmapToCanvas(source, w, h);
+        const sourceEl = source instanceof HTMLVideoElement || source instanceof HTMLCanvasElement ? source : await imageBitmapToCanvas(source, w, h);
 
         const mpgCanvas = await renderMPGFrame(manifest, sourceEl, {
           timelineTimeMs: videoEffects[0]?.localTime ? videoEffects[0].localTime * 1000 : 500,
@@ -791,11 +781,13 @@ async function renderMediaFrame(source: HTMLVideoElement | ImageBitmap | HTMLCan
 
         if (filter) {
           const filtered = CanvasDevice.acquire(w, h);
-          const fctx = filtered.getContext("2d")!;
-          const ir = resolveFilterToIR(filter.id, filter.intensity);
-          const cssFilter = compileFilterIRToCSS(ir);
-          if (cssFilter) fctx.filter = cssFilter;
-          fctx.drawImage(mpgCanvas, 0, 0, w, h);
+          const fctx = filtered.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+          if (fctx) {
+            const ir = resolveFilterToIR(filter.id, filter.intensity);
+            const cssFilter = compileFilterIRToCSS(ir);
+            if (cssFilter) fctx.filter = cssFilter;
+            fctx.drawImage(mpgCanvas, 0, 0, w, h);
+          }
           return filtered;
         }
 
@@ -1478,29 +1470,6 @@ async function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanva
   const unscaledOffW = Math.max(1, Math.ceil(safeWidth + unscaledPaddingX * 2));
   const unscaledOffH = Math.max(1, Math.ceil(safeHeight + unscaledPaddingY * 2));
 
-  textRenderTrace("text-raster-bounds", {
-    clipId: layer.clipId,
-    layerId: layer.layerId,
-    text: layer.text,
-    styleId: layer.styleId,
-    hasLayerStyleDefinition: !!layer.styleDefinition,
-    hasStoreDefinition: !!(layer.styleId && useEffectsStore.getState().definitions[layer.styleId]),
-    resolvedDefinitionId: effectDef?.id,
-    contentBounds: { x: layer.x, y: layer.y, width: layer.width, height: layer.height, opacity: layer.opacity },
-    fontSize,
-    unscaledFontSize,
-    renderBleed: declaredBleed,
-    scaledRenderPadding: { x: effectPaddingX, y: effectPaddingY },
-    renderBounds: { width: offW, height: offH, scaleX, scaleY },
-    unscaledRenderBounds: { width: unscaledOffW, height: unscaledOffH },
-    drawDestination: {
-      x: -width / 2 - effectPaddingX,
-      y: -height / 2 - effectPaddingY,
-      width: offW,
-      height: offH,
-    },
-  });
-
   let engineConfig: TextEffectConfig;
 
   if (layer.styleId) {
@@ -1574,31 +1543,6 @@ async function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanva
     engineConfig = buildPlainTextEffectConfig(layer, unscaledOffW, unscaledOffH, unscaledFontSize, 1.0, 1.0);
   }
 
-  textRenderTrace("rasterize-text-config", {
-    clipId: layer.clipId,
-    styleId: layer.styleId,
-    text: engineConfig.text,
-    fontFamily: engineConfig.fontFamily,
-    fontSize: engineConfig.fontSize,
-    fontWeight: engineConfig.fontWeight,
-    fontStyle: engineConfig.fontStyle,
-    canvasWidth: engineConfig.canvasWidth,
-    canvasHeight: engineConfig.canvasHeight,
-    textPosX: (engineConfig as any).textPosX,
-    textPosY: (engineConfig as any).textPosY,
-    fillType: (engineConfig as any).fillType,
-    strokeEnabled: (engineConfig as any).strokeEnabled,
-    glowLayers: (engineConfig as any).glowLayers,
-    panelEnabled: (engineConfig as any).panelEnabled,
-    panelColor: (engineConfig as any).panelColor,
-    panelOpacity: (engineConfig as any).panelOpacity,
-    panelRadius: (engineConfig as any).panelRadius,
-    panelPaddingX: (engineConfig as any).panelPaddingX,
-    panelPaddingY: (engineConfig as any).panelPaddingY,
-    panelStrokeEnabled: (engineConfig as any).panelStrokeEnabled,
-    panelStrokeWidth: (engineConfig as any).panelStrokeWidth,
-    layerBackground: layer.background,
-  });
   const sceneDoc = textEffectConfigToScene(engineConfig);
 
   // Acquire canvas context from the unified CanvasDevice pool
@@ -1614,48 +1558,14 @@ async function rasterizeTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanva
     offCtx.clearRect(0, 0, unscaledOffW, unscaledOffH);
 
     engineEvaluateScene(sceneDoc, layer.time ?? 0, offCtx as unknown as CanvasRenderingContext2D);
-    const alpha = sampleCanvasAlpha(offCtx, unscaledOffW, unscaledOffH);
-    const alphaLayerBounds = alpha?.bounds
-      ? {
-          x: alpha.bounds.x - unscaledPaddingX,
-          y: alpha.bounds.y - unscaledPaddingY,
-          width: alpha.bounds.width,
-          height: alpha.bounds.height,
-          overflowsContent: alpha.bounds.x < unscaledPaddingX || alpha.bounds.y < unscaledPaddingY || alpha.bounds.x + alpha.bounds.width > unscaledPaddingX + safeWidth || alpha.bounds.y + alpha.bounds.height > unscaledPaddingY + safeHeight,
-        }
-      : null;
-    textRenderTrace("text-raster-bounds", {
-      clipId: layer.clipId,
-      styleId: layer.styleId,
-      contentBounds: { x: layer.x, y: layer.y, width: layer.width, height: layer.height },
-      unscaledRenderBounds: { width: unscaledOffW, height: unscaledOffH },
-      unscaledRenderPadding: { x: unscaledPaddingX, y: unscaledPaddingY },
-      alpha,
-      alphaLayerBounds,
-    });
+
     const visibleAlpha = hasVisibleAlpha(offCtx, unscaledOffW, unscaledOffH);
-    if (alpha && alpha.visiblePixels === 0) {
-      textRenderWarn("rasterize-text-blank-offscreen", {
-        clipId: layer.clipId,
-        styleId: layer.styleId,
-        text: layer.text,
-        fontFamily: engineConfig.fontFamily,
-        fontSize: engineConfig.fontSize,
-        offscreen: { width: unscaledOffW, height: unscaledOffH },
-        hasEffectDef: !!effectDef,
-      });
-    }
+
     if (layer.styleId && visibleAlpha === false) {
       const fallbackConfig = buildPlainTextEffectConfig(layer, unscaledOffW, unscaledOffH, unscaledFontSize, 1.0, 1.0);
       const fallbackSceneDoc = textEffectConfigToScene(fallbackConfig);
       offCtx.clearRect(0, 0, unscaledOffW, unscaledOffH);
       engineEvaluateScene(fallbackSceneDoc, layer.time ?? 0, offCtx as unknown as CanvasRenderingContext2D);
-      textRenderWarn("rasterize-text-effect-fallback", {
-        clipId: layer.clipId,
-        styleId: layer.styleId,
-        text: layer.text,
-        reason: "styled effect rendered no visible pixels",
-      });
     }
     // Draw the unscaled offscreen canvas scaled down to the preview resolution.
     // Source rect: full unscaled canvas

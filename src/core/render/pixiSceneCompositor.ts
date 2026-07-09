@@ -182,6 +182,13 @@ export class PixiSceneCompositor {
             record.lastSeenFrame = frameId;
             record.sprite.visible = true;
 
+            // Update video texture to upload the latest frame to the GPU (critical for stacked tracks/paused states)
+            if (mediaLayer.mediaType === "video" && sourceElement instanceof HTMLVideoElement) {
+              if (sourceElement.readyState >= 2) {
+                record.texture.source.update();
+              }
+            }
+
             // Capture video source dimensions if not already stored
             if (mediaLayer.mediaType === "video" && sourceElement instanceof HTMLVideoElement) {
               const conform = mediaLayer.conform;
@@ -245,6 +252,11 @@ export class PixiSceneCompositor {
           renderOrder
         );
       }
+    }
+
+    // Ensure children are sorted by their zIndex before rendering
+    if (typeof baseMediaContainer.sortChildren === "function") {
+      baseMediaContainer.sortChildren();
     }
 
     // 2. Reconcile frames
@@ -374,6 +386,13 @@ export class PixiSceneCompositor {
     if (sourceElement) {
       const record = getOrCreateMediaSprite(layer.clipId, layer.mediaType, sourceElement, container);
       record.lastSeenFrame = this.currentFrameId;
+
+      // Update video texture to upload the latest frame to the GPU during transitions
+      if (layer.mediaType === "video" && sourceElement instanceof HTMLVideoElement) {
+        if (sourceElement.readyState >= 2) {
+          record.texture.source.update();
+        }
+      }
 
       const layersCopy = { ...layer, opacity: 1.0 };
       const internalViewport = {

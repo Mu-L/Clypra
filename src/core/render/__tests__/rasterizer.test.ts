@@ -127,5 +127,85 @@ describe("Scene Rasterizer Suite", () => {
       // Verify that drawImage was called to draw the video element
       expect(mockCtx.drawImage).toHaveBeenCalled();
     });
+
+    it("should draw both video elements when multiple video layers are stacked/overlapping", async () => {
+      const mockStackedScene = {
+        sceneId: "scene-2",
+        timestamp: 1.0,
+        visualLayers: [
+          {
+            layerId: "layer-video-1",
+            layerType: "media",
+            mediaType: "video",
+            mediaId: "video-asset-1",
+            sourcePath: "asset1.mp4",
+            clipId: "clip-1",
+            startTime: 0,
+            duration: 5.0,
+            trimIn: 0,
+            trimOut: 5.0,
+            x: 0, y: 0, width: 1920, height: 1080, rotation: 0,
+            opacity: 1,
+            blendMode: "normal",
+            sourceRotation: 0,
+            sourceTime: 1.0,
+            clipKind: "media",
+          } as any,
+          {
+            layerId: "layer-video-2",
+            layerType: "media",
+            mediaType: "video",
+            mediaId: "video-asset-2",
+            sourcePath: "asset2.mp4",
+            clipId: "clip-2",
+            startTime: 0,
+            duration: 5.0,
+            trimIn: 0,
+            trimOut: 5.0,
+            x: 0, y: 0, width: 1920, height: 1080, rotation: 0,
+            opacity: 1,
+            blendMode: "normal",
+            sourceRotation: 0,
+            sourceTime: 1.0,
+            clipKind: "media",
+          } as any,
+        ],
+        audioLayers: [],
+        transitions: [],
+        activeFilter: undefined,
+        metadata: {
+          canvasWidth: 1920,
+          canvasHeight: 1080,
+        } as any,
+      } as any as EvaluatedScene;
+
+      const mockVideoElement1 = {
+        readyState: 4,
+        playbackRate: 1.0,
+        play: vi.fn(),
+      } as unknown as HTMLVideoElement;
+
+      const mockVideoElement2 = {
+        readyState: 4,
+        playbackRate: 1.0,
+        play: vi.fn(),
+      } as unknown as HTMLVideoElement;
+
+      const videoElements = new Map<string, HTMLVideoElement>();
+      videoElements.set("clip-1-video-asset-1", mockVideoElement1);
+      videoElements.set("clip-2-video-asset-2", mockVideoElement2);
+
+      const target = {
+        width: 1920,
+        height: 1080,
+        videoElements,
+      };
+
+      const frame = await rasterizeScene(mockStackedScene, target);
+      const mockCtx = frame.ctx;
+
+      // Verify that drawImage was called to draw both video elements
+      expect(mockCtx.drawImage).toHaveBeenCalledTimes(2);
+    });
   });
 });
