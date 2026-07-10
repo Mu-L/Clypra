@@ -414,6 +414,10 @@ export const PixiProgramPreview: React.FC = () => {
     let lastRenderedTime = -1;
     let lastRenderedEpoch = -1;
     let lastRenderedPlaybackState: "playing" | "paused" | "stopped" = "stopped";
+    let lastRenderedClips = renderStateRef.current.clips;
+    let lastRenderedTracks = renderStateRef.current.tracks;
+    let lastRenderedTransitions = renderStateRef.current.transitions;
+    let lastRenderedProject = renderStateRef.current.project;
     // Tracks clip keys (id-mediaId) that have ever reported readyState > 2.
     // Resets when this effect restarts (project switch, canvas remount).
     // Used by the Bug 4 refinement to distinguish initial slow-load from mid-seek dips.
@@ -491,8 +495,30 @@ export const PixiProgramPreview: React.FC = () => {
       const transformController = getTransformController();
       const hasActiveTransform = transformController.getActiveTransform() !== null;
 
-      const needsRender = isPlaying || timeChanged || epochChanged || isFirstFrame || forceRenderNeeded || hasActiveTransform;
-      if (needsRender && forceRenderNeeded) forceRenderNeeded = false;
+      const clipsChanged = state.clips !== lastRenderedClips;
+      const tracksChanged = state.tracks !== lastRenderedTracks;
+      const transitionsChanged = state.transitions !== lastRenderedTransitions;
+      const projectChanged = state.project !== lastRenderedProject;
+
+      const needsRender =
+        isPlaying ||
+        timeChanged ||
+        epochChanged ||
+        isFirstFrame ||
+        forceRenderNeeded ||
+        hasActiveTransform ||
+        clipsChanged ||
+        tracksChanged ||
+        transitionsChanged ||
+        projectChanged;
+
+      if (needsRender) {
+        lastRenderedClips = state.clips;
+        lastRenderedTracks = state.tracks;
+        lastRenderedTransitions = state.transitions;
+        lastRenderedProject = state.project;
+        if (forceRenderNeeded) forceRenderNeeded = false;
+      }
 
       if (needsRender && compositorRef.current) {
         const canvasDpr = window.devicePixelRatio || 1;
