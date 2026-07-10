@@ -285,6 +285,7 @@ export function evaluateTimelineScene(time: number, clips: Clip[], tracks: Track
         (activeFilterClip
           ? {
               id: activeFilterClip.mediaId,
+              name: activeFilterClip.name || "",
               intensity: normalizeFilterIntensity((activeFilterClip as any).intensity),
             }
           : undefined),

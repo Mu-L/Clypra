@@ -342,6 +342,8 @@ export class PixiSceneCompositor {
 
     if (sourceElement) {
       const record = getOrCreateMediaSprite(layer.clipId, layer.mediaType, sourceElement, container);
+      if (!record) return texture;
+
       record.lastSeenFrame = this.currentFrameId;
 
       // Update video texture using VideoTextureManager from PreviewMediaPool

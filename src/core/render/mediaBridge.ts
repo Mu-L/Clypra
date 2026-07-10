@@ -1,26 +1,9 @@
 import { Sprite, Texture, BlurFilter, Filter } from "pixi.js";
 import { AdjustmentFilter } from "pixi-filters";
 import { resolveFilterToIR } from "./filterIR.js";
-import {
-  createGPUPixelateFilter,
-  createGPUScanlinesFilter,
-  createGPURGBSplitFilter,
-  createGPUFilmGrainFilter,
-  createGPUVignetteFilter,
-} from "./gpuFilters.js";
+import { createGPUPixelateFilter, createGPUScanlinesFilter, createGPURGBSplitFilter, createGPUFilmGrainFilter, createGPUVignetteFilter } from "./gpuFilters.js";
 
-import {
-  applyMediaTransform as engineApplyTransform,
-  releaseMediaSprite as engineReleaseSprite,
-  getOrCreateMediaSprite as engineGetOrCreateSprite,
-  getActiveMediaSpriteKeys,
-  getMediaSpriteRecord,
-  createGPUBodyOutlineFilter,
-  createGPUBodyGlowFilter,
-  createGPUBodyParticlesFilter,
-  type MediaSpriteRecord,
-  type RenderViewport,
-} from "@clypra-studio/engine";
+import { applyMediaTransform as engineApplyTransform, releaseMediaSprite as engineReleaseSprite, getOrCreateMediaSprite as engineGetOrCreateSprite, getActiveMediaSpriteKeys, getMediaSpriteRecord, createGPUBodyOutlineFilter, createGPUBodyGlowFilter, createGPUBodyParticlesFilter, type MediaSpriteRecord, type RenderViewport } from "@clypra-studio/engine";
 
 export type { MediaSpriteRecord, RenderViewport };
 
@@ -34,12 +17,7 @@ export function releaseMediaSprite(clipId: string, container: import("pixi.js").
   engineReleaseSprite(clipId, container);
 }
 
-export function getOrCreateMediaSprite(
-  clipId: string,
-  kind: "video" | "image",
-  sourceElement: HTMLVideoElement | ImageBitmap | HTMLImageElement,
-  container: import("pixi.js").Container,
-): MediaSpriteRecord {
+export function getOrCreateMediaSprite(clipId: string, kind: "video" | "image", sourceElement: HTMLVideoElement | ImageBitmap | HTMLImageElement, container: import("pixi.js").Container): MediaSpriteRecord | null {
   return engineGetOrCreateSprite(clipId, kind, sourceElement, container);
 }
 
@@ -55,12 +33,7 @@ export function beginMediaFrame(container: import("pixi.js").Container): void {
 /**
  * Compiles and applies GPU-accelerated video/body filters directly to the PixiJS Sprite.
  */
-function applyMediaEffectsAndFilters(
-  sprite: Sprite,
-  layer: any,
-  bodyMasks: Map<string, any>,
-  viewport: RenderViewport,
-): void {
+function applyMediaEffectsAndFilters(sprite: Sprite, layer: any, bodyMasks: Map<string, any>, viewport: RenderViewport): void {
   const filters: Filter[] = [];
   const width = sprite.texture.source.width || layer.width;
   const height = sprite.texture.source.height || layer.height;
@@ -69,7 +42,7 @@ function applyMediaEffectsAndFilters(
   if (layer.filter && layer.filter.intensity > 0.001) {
     const ir = resolveFilterToIR(layer.filter.id, layer.filter.intensity);
     const adj = new AdjustmentFilter();
-    
+
     if (ir.sepia !== undefined) {
       adj.contrast = 1.0 - ir.sepia * 0.15;
     }
@@ -126,10 +99,10 @@ function applyMediaEffectsAndFilters(
         maskCanvas.height = maskData.height;
         maskCanvas.getContext("2d")!.putImageData(maskData, 0, 0);
         const maskTexture = Texture.from(maskCanvas);
-        
+
         const color = String(effect.parameters.outlineColor ?? effect.parameters.glowColor ?? "#ffffff");
         const thickness = Math.max(1, Number(effect.parameters.thickness ?? 5) * effect.intensity);
-        
+
         filters.push(createGPUBodyOutlineFilter(maskTexture, color, thickness));
       }
     } else if (norm === "body_glow" || norm === "body_segmentation_glow") {
@@ -140,11 +113,11 @@ function applyMediaEffectsAndFilters(
         maskCanvas.height = maskData.height;
         maskCanvas.getContext("2d")!.putImageData(maskData, 0, 0);
         const maskTexture = Texture.from(maskCanvas);
-        
+
         const color = String(effect.parameters.glowColor ?? "#00ffff");
         const radius = Math.max(2, Number(effect.parameters.glowRadius ?? 22) * effect.intensity);
         const alpha = Math.min(1, Number(effect.parameters.glowIntensity ?? 0.8) * effect.intensity);
-        
+
         filters.push(createGPUBodyGlowFilter(maskTexture, color, radius, alpha));
       }
     } else if (norm === "body_particles") {
@@ -155,11 +128,11 @@ function applyMediaEffectsAndFilters(
         maskCanvas.height = maskData.height;
         maskCanvas.getContext("2d")!.putImageData(maskData, 0, 0);
         const maskTexture = Texture.from(maskCanvas);
-        
+
         const color = String(effect.parameters.particleColor ?? effect.parameters.glowColor ?? "#00ffff");
         const count = Math.floor(Number(effect.parameters.particleCount ?? 120) * effect.intensity);
         const time = effect.localTime || 0;
-        
+
         filters.push(createGPUBodyParticlesFilter(maskTexture, color, count, effect.intensity, time));
       }
     }
@@ -171,16 +144,9 @@ function applyMediaEffectsAndFilters(
 /**
  * Registers and updates a base media layer's sprite in the current frame.
  */
-export function renderBaseMediaLayer(
-  layer: any,
-  frameId: number,
-  sourceEl: HTMLVideoElement | ImageBitmap | HTMLImageElement,
-  container: import("pixi.js").Container,
-  viewport: RenderViewport,
-  renderOrder: number,
-  bodyMasks: Map<string, any> = new Map(),
-): void {
+export function renderBaseMediaLayer(layer: any, frameId: number, sourceEl: HTMLVideoElement | ImageBitmap | HTMLImageElement, container: import("pixi.js").Container, viewport: RenderViewport, renderOrder: number, bodyMasks: Map<string, any> = new Map()): void {
   const record = getOrCreateMediaSprite(layer.clipId, layer.mediaType, sourceEl, container);
+  if (!record) return;
 
   record.lastSeenFrame = frameId;
   record.sprite.visible = true;
