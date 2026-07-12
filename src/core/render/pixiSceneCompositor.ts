@@ -50,6 +50,20 @@ export class PixiSceneCompositor {
     this.setupContextLossHandlers(canvas);
   }
 
+  get isReady(): boolean {
+    return this.renderer?.isReady || false;
+  }
+
+  async waitForReady(timeoutMs = 10_000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (!this.renderer?.isReady) {
+      if (Date.now() >= deadline) {
+        throw new Error(`[PixiSceneCompositor] Timed out after ${timeoutMs}ms waiting for WebGL renderer to initialize. ` + `The GPU context may be unavailable or the browser has denied WebGL access.`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+
   private setupContextLossHandlers(canvas: HTMLCanvasElement): void {
     this.contextLostHandler = (event: Event) => {
       event.preventDefault();
