@@ -152,6 +152,7 @@ export async function exportVideo(config: VideoExportConfig): Promise<VideoExpor
   const videoPool = new VideoElementPool({
     maxConcurrent: 10,
     debug: false,
+    isExport: true,
   });
 
   // Create headless Pixi compositor for this export session.
@@ -259,6 +260,25 @@ export async function exportVideo(config: VideoExportConfig): Promise<VideoExpor
   }
 
   let inFlightWritePromise: Promise<void> | null = null;
+
+  // Create an AudioContext and play a silent loop to prevent background throttling
+  let audioCtx: AudioContext | null = null;
+  let oscillator: OscillatorNode | null = null;
+  let gainNode: GainNode | null = null;
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContextClass) {
+      audioCtx = new AudioContextClass();
+      oscillator = audioCtx.createOscillator();
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = 0.001; // Extremely quiet but active to register as audio activity
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.start();
+    }
+  } catch (e) {
+    console.warn("[videoExport] Failed to start silent audio context for background keep-alive:", e);
+  }
 
   try {
     // Render and write frames
@@ -372,6 +392,21 @@ export async function exportVideo(config: VideoExportConfig): Promise<VideoExpor
       throw error;
     }
   } finally {
+    if (oscillator) {
+      try {
+        oscillator.stop();
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (audioCtx) {
+      try {
+        audioCtx.close();
+      } catch (e) {
+        // ignore
+      }
+    }
+
     // Always clean up video pool and Pixi compositor
     videoPool.clear();
     destroyPixiExportCompositor(pixiHandle);

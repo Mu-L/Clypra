@@ -84,6 +84,7 @@ export async function exportVideoMobile(config: VideoExportConfig): Promise<Vide
   const videoPool = new VideoElementPool({
     maxConcurrent: 5, // Conservative limit for mobile devices to prevent Out of Memory
     debug: false,
+    isExport: true,
   });
 
   const pixiHandle = createPixiExportCompositor(width, height);
