@@ -31,6 +31,7 @@ import { PixiSceneCompositor } from "@/core/render/pixiSceneCompositor";
 import type { EvaluatedScene } from "@/core/evaluation/types";
 import { clearAllTextBridges } from "@/core/render/textBridge";
 import { clearAllStickerBridges } from "@/core/render/stickerBridge";
+import type { VideoFrameSource } from "@/core/render/utils/mediaResolver";
 
 // ── Minimal pool adapter for export ──────────────────────────────────────────
 // The real PreviewMediaPool tracks frame callbacks from requestVideoFrameCallback
@@ -159,7 +160,7 @@ export function destroyPixiExportCompositor(handle: PixiExportCompositor): void 
  *
  * @param handle        - Compositor handle from createPixiExportCompositor
  * @param scene         - Evaluated scene for this frame (from evaluateTimelineSceneCached)
- * @param videoElements - Map of `${clipId}-${mediaId}` → HTMLVideoElement (pre-seeked)
+ * @param videoElements - Map of `${clipId}-${mediaId}` to a decoded video source
  * @returns             - ImageData containing RGBA pixels for this frame
  */
 export async function renderFrameWithPixi(
@@ -168,6 +169,8 @@ export async function renderFrameWithPixi(
   videoElements: Map<string, HTMLVideoElement>,
   directWebGLReadback = false,
 ): Promise<ImageData | Uint8Array> {
+  videoElements: Map<string, VideoFrameSource>,
+): Promise<ImageData> {
   const { compositor, canvas, readbackCanvas, readbackCtx, width, height } = handle;
 
   // Resolve native project size. We must scale the layout if exporting at a resolution
